@@ -1,0 +1,111 @@
+:root {
+            /* PALETA LARANJA (DEFINITIVA) */
+            --primary-color: #E65100;    /* Laranja Principal */
+            --primary-hover: #BF360C;    /* Laranja Escuro (Hover) */
+            --secondary-blue: #233486;   /* Azul para Textos/Títulos */
+            --bg-color: #F8F9FA;         /* Fundo Gelo */
+            
+            /* CORES DE STATUS */
+            --status-atrasada-bg: #FFEBEE;
+            --status-atrasada-text: #D32F2F;
+            --status-atrasada-border: #EF5350;
+
+            --status-aplicada-bg: #E8F5E9;
+            --status-aplicada-text: #2E7D32;
+            --status-aplicada-border: #66BB6A;
+
+            --status-pendente-bg: #F5F5F5;
+            --status-pendente-text: #616161;
+            --status-pendente-border: #BDBDBD;
+        }
+
+        body { 
+            background-color: var(--bg-color); 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* HEADER */
+        .header-custom {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .user-avatar {
+            background-color: white;
+            color: var(--primary-color);
+            border: 2px solid rgba(255,255,255,0.8);
+            width: 45px; height: 45px; border-radius: 50%; 
+            display: inline-flex; align-items: center; justify-content: center; 
+            font-size: 22px; margin-right: 10px;
+        }
+
+        /* BOTÕES DA HOME */
+        .btn-dashboard {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 30px 20px;
+            width: 100%;
+            height: 140px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(230, 81, 0, 0.3);
+        }
+
+        .btn-dashboard:hover {
+            transform: translateY(-3px);
+            background-color: var(--primary-hover);
+            color: white;
+            box-shadow: 0 8px 15px rgba(230, 81, 0, 0.4);
+        }
+
+        .dashboard-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .dashboard-label { font-size: 1.1rem; font-weight: 600; }
+
+        /* TIPOGRAFIA */
+        h1, h2, h3, h4, h5, .text-primary {
+            color: var(--secondary-blue) !important;
+        }
+
+        /* BOTÃO VOLTAR */
+        .btn-voltar-destaque {
+            background-color: white;
+            color: var(--primary-color);
+            border: 1px solid #ddd;
+            font-weight: 600;
+            border-radius: 50px;
+            padding: 8px 20px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .btn-voltar-destaque:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        /* BOTÃO DE AÇÃO LARANJA */
+        .btn-laranja {
+            background-color: var(--primary-color) !important;
+            color: white !important;
+            border: none;
+            font-weight: bold;
+        }
+        .btn-laranja:hover {
+            background-color: var(--primary-hover) !important;
+        }
