@@ -51,6 +51,7 @@ class Vacina(models.Model):
 
 # 4. Cartão de Vacina (O Registro da Aplicação)
 class RegistroVacina(models.Model):
+    
     STATUS_CHOICES = [
         ('PENDENTE', 'Em Aberto'),
         ('ATRASADA', 'Atrasada'), # Isso pode ser calculado dinamicamente também
@@ -64,8 +65,9 @@ class RegistroVacina(models.Model):
         ('INTRADERMICA', 'Intradérmica'),
     ]
 
-    crianca = models.ForeignKey(Crianca, on_delete=models.CASCADE, related_name='vacinas')
-    vacina = models.ForeignKey(Vacina, on_delete=models.PROTECT)
+    crianca = models.ForeignKey(Crianca, on_delete=models.CASCADE, related_name='registros') 
+    
+    vacina = models.ForeignKey(Vacina, on_delete=models.CASCADE)
     
     # Detalhes da aplicação
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')

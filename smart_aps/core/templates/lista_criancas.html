@@ -6,33 +6,41 @@
         <i class="fa-solid fa-arrow-left"></i> Voltar
     </a>
     <h4 class="text-primary fw-bold m-0"><i class="fa-solid fa-table"></i> Controle</h4>
-    <a href="{% url 'cadastrar_crianca' %}" class="btn btn-success btn-sm shadow-sm">
+    <a href="{% url 'cadastrar_crianca' %}" class="btn btn-laranja shadow-sm rounded-pill btn-sm px-3">
         <i class="fa-solid fa-plus"></i> Novo Paciente
     </a>
 </div>
 
 <form method="get" class="mb-4">
     <div class="input-group shadow-sm">
-        <input type="text" name="busca" class="form-control" placeholder="Buscar por nome ou CPF...">
-        <button class="btn btn-primary" type="submit"><i class="fa-solid fa-search"></i></button>
+        <input type="text" name="busca" class="form-control border-0" placeholder="Buscar por nome..." value="{{ request.GET.busca|default:'' }}">
+        <button class="btn btn-primary" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+        {% if request.GET.busca %}
+            <a href="{% url 'lista_criancas' %}" class="btn btn-outline-secondary">Limpar</a>
+        {% endif %}
     </div>
 </form>
 
 <div class="list-group shadow-sm">
     {% for crianca in criancas %}
-    <a href="{% url 'cartao_vacina' crianca.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3">
+    <a href="{% url 'cartao_vacina' crianca.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3 border-bottom">
+        
         <div>
             <h5 class="mb-1 fw-bold text-dark">{{ crianca.nome }}</h5>
+            <small class="text-muted d-block">
+                <i class="fa-solid fa-person-breastfeeding"></i> Mãe: {{ crianca.nome_mae }}
+            </small>
             <small class="text-muted">
-                <i class="fa-solid fa-person-breastfeeding"></i> Mãe: {{ crianca.nome_mae }} | 
                 <i class="fa-solid fa-id-card-clip"></i> CNS: {{ crianca.cns }}
             </small>
         </div>
-        <i class="fa-solid fa-chevron-right text-muted"></i>
+
+        <i class="fa-solid fa-chevron-right text-muted opacity-50"></i>
     </a>
     {% empty %}
-    <div class="alert alert-info text-center">
-        <i class="fa-solid fa-circle-info"></i> Nenhuma criança encontrada.
+    <div class="alert alert-light text-center py-5">
+        <i class="fa-solid fa-child-reaching fa-3x text-muted mb-3"></i><br>
+        Nenhuma criança encontrada.
     </div>
     {% endfor %}
 </div>

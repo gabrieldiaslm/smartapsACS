@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from .models import Crianca, Vacina, RegistroVacina, UsuarioACS
 from .forms import CriancaForm, RegistroVacinaForm, UsuarioACSForm
 from datetime import date, timedelta
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.contrib import messages # Para dar feedback visual
 from django.views.decorators.cache import never_cache
 def is_admin(user):
@@ -125,9 +125,10 @@ def cartao_vacina(request, crianca_id):
         RegistroVacina.objects.bulk_update(registros_para_atualizar, ['status'])
         
     # === 2. BUSCA PARA EXIBIÇÃO (Já com dados atualizados) ===
+    #    Ordenamos primeiro pela IDADE (cronológico) e depois pelo NOME
     registros = RegistroVacina.objects.filter(crianca=crianca)\
         .select_related('vacina')\
-        .order_by('vacina__nome', 'vacina__idade_alvo_meses')
+        .order_by('vacina__idade_alvo_meses', 'vacina__nome') # <--- MUDANÇA AQUI
     
     return render(request, 'cartao_vacina.html', {'crianca': crianca, 'registros': registros})
 
@@ -158,18 +159,19 @@ def calendario_guia(request):
 @never_cache
 @login_required
 def censo_demografico(request):
-    """Card 4: Visão Planilha/Censo com estatísticas"""
+    """Card 4: Censo com estatísticas corrigidas e status"""
     
-    # 1. A Lista Base (Pode ter filtros no futuro)
-    criancas = Crianca.objects.all().order_by('data_nascimento')
+    # 1. A Lista Base
+    # O annotate verifica se existe ALGUM registro com status 'ATRASADA'
+    criancas = Crianca.objects.annotate(
+        tem_atraso=Count('registros', filter=Q(registros__status='ATRASADA'))
+    ).order_by('data_nascimento')
 
-    # 2. Cálculos Estatísticos (Para o topo da planilha)
+    # 2. Cálculos Estatísticos (MÉTODO CORRIGIDO E SIMPLIFICADO)
+    # Usamos filter().count() direto para evitar erro de agrupamento
     total = criancas.count()
-    
-    # Conta por sexo
-    por_sexo = criancas.values('sexo').annotate(qtd=Count('sexo'))
-    meninos = next((item['qtd'] for item in por_sexo if item['sexo'] == 'M'), 0)
-    meninas = next((item['qtd'] for item in por_sexo if item['sexo'] == 'F'), 0)
+    meninos = criancas.filter(sexo='M').count()
+    meninas = criancas.filter(sexo='F').count()
 
     # Conta bebês (< 1 ano)
     um_ano_atras = date.today() - timedelta(days=365)
