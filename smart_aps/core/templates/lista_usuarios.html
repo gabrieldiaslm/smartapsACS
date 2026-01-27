@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <a href="{% url 'index' %}" class="btn-voltar-destaque">
+        <i class="fa-solid fa-arrow-left"></i> Início
+    </a>
+    <h3 class="fw-bold m-0" style="color: var(--secondary-blue);">
+        <i class="fa-solid fa-users-gear"></i> Gestão de Equipe
+    </h3>
+    <a href="{% url 'cadastrar_acs' %}" class="btn btn-laranja shadow-sm rounded-pill">
+        <i class="fa-solid fa-user-plus"></i> Novo ACS
+    </a>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header text-white fw-bold" style="background-color: var(--secondary-blue);">
+        Agentes Cadastrados
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome Completo</th>
+                    <th>Usuário (Login)</th>
+                    <th>E-mail</th>
+                    <th>CNES / Unidade</th>
+                    <th class="text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for usuario in usuarios %}
+                <tr>
+                    <td class="fw-bold" style="color: var(--primary-color);">
+                        {{ usuario.first_name }} {{ usuario.last_name }}
+                    </td>
+                    <td class="font-monospace text-muted">{{ usuario.username }}</td>
+                    <td>{{ usuario.email|default:"-" }}</td>
+                    <td><span class="badge bg-light text-dark border">{{ usuario.cnes_unidade|default:"N/A" }}</span></td>
+                    <td class="text-center">
+                        {% if usuario.is_active %}
+                            <span class="badge bg-success-subtle text-success border border-success">Ativo</span>
+                        {% else %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger">Inativo</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-user-slash fa-2x mb-2 opacity-50"></i><br>
+                        Nenhum agente encontrado.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-white text-muted small">
+        Total de Agentes: <strong>{{ usuarios.count }}</strong>
+    </div>
+</div>
+{% endblock %}

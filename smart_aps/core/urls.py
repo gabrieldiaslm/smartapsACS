@@ -11,5 +11,6 @@ urlpatterns = [
     path('calendario-guia/', views.calendario_guia, name='calendario_guia'),
     path('censo/', views.censo_demografico, name='censo_demografico'), # Card 4 (Relatório/Planilha)
     path('gestao/novo-acs/', views.cadastrar_acs, name='cadastrar_acs'),
+    path('gestao/equipe/', views.lista_usuarios, name='lista_usuarios'), # NOVA ROTA
 
 ]

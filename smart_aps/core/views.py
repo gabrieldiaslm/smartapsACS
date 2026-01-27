@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
-from .models import Crianca, Vacina, RegistroVacina
+from .models import Crianca, Vacina, RegistroVacina, UsuarioACS
 from .forms import CriancaForm, RegistroVacinaForm, UsuarioACSForm
 from datetime import date, timedelta
 from django.db.models import Count
@@ -97,11 +97,34 @@ def cadastrar_crianca(request):
 # core/views.py
 
 
+@never_cache
 @login_required
 def cartao_vacina(request, crianca_id):
     crianca = get_object_or_404(Crianca, pk=crianca_id)
     
-    # IMPORTANTE: A ordenação por 'vacina__nome' é OBRIGATÓRIA para o regroup funcionar
+    # === 1. LÓGICA DE ATUALIZAÇÃO AUTOMÁTICA ===
+    hoje = date.today()
+    
+    # Calcula a idade da criança em meses
+    # Ex: (2026 - 2025) * 12 + (1 - 1) = 12 meses
+    idade_meses = (hoje.year - crianca.data_nascimento.year) * 12 + (hoje.month - crianca.data_nascimento.month)
+    
+    # Busca vacinas que NÃO foram aplicadas (Pendentes ou já Atrasadas)
+    registros_pendentes = RegistroVacina.objects.filter(crianca=crianca).exclude(status='APLICADA')
+    
+    registros_para_atualizar = []
+    
+    for registro in registros_pendentes:
+        # Se a idade da criança passou da idade alvo E o status ainda não é 'ATRASADA'
+        if idade_meses > registro.vacina.idade_alvo_meses and registro.status != 'ATRASADA':
+            registro.status = 'ATRASADA'
+            registros_para_atualizar.append(registro)
+    
+    # Salva todos de uma vez (Performance otimizada)
+    if registros_para_atualizar:
+        RegistroVacina.objects.bulk_update(registros_para_atualizar, ['status'])
+        
+    # === 2. BUSCA PARA EXIBIÇÃO (Já com dados atualizados) ===
     registros = RegistroVacina.objects.filter(crianca=crianca)\
         .select_related('vacina')\
         .order_by('vacina__nome', 'vacina__idade_alvo_meses')
@@ -162,3 +185,12 @@ def censo_demografico(request):
     }
     
     return render(request, 'censo_demografico.html', context)
+
+@never_cache
+@user_passes_test(is_admin)
+def lista_usuarios(request):
+    """Card 6: Admin visualiza lista de usuários"""
+    # Exclui o próprio superuser da lista para evitar acidentes, ou mostra todos
+    usuarios = UsuarioACS.objects.filter(is_superuser=False).order_by('first_name')
+    
+    return render(request, 'lista_usuarios.html', {'usuarios': usuarios})
