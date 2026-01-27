@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <a href="{% url 'index' %}" class="btn-voltar-destaque">
+        <i class="fa-solid fa-arrow-left"></i> Início
+    </a>
+    <h3 class="fw-bold" style="color: #7b1fa2;"><i class="fa-solid fa-user-plus"></i> Novo Agente de Saúde</h3>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow border-0">
+            <div class="card-header text-white text-center py-3" style="background-color: #7b1fa2;">
+                <h5 class="mb-0">Dados de Acesso</h5>
+            </div>
+            <div class="card-body p-4">
+                
+                <div class="alert alert-warning small">
+                    <i class="fa-solid fa-circle-info"></i> O novo usuário terá acesso padrão ao sistema e <strong>não</strong> terá permissões administrativas.
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">{{ field.label }}</label>
+                        {{ field }} {% if field.help_text %}
+                            <small class="form-text text-muted">{{ field.help_text }}</small>
+                        {% endif %}
+                        {% if field.errors %}
+                            <div class="text-danger small">{{ field.errors }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-lg text-white" style="background-color: #7b1fa2;">
+                            Confirmar Cadastro
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var inputs = document.querySelectorAll('input');
+    inputs.forEach(function(input) {
+        input.classList.add('form-control');
+    });
+</script>
+{% endblock %}

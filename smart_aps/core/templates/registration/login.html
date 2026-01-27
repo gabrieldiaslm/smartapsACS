@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white text-center">
+                <h4>Acesso SMART APS</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            Usuário ou senha incorretos.
+                        </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label for="id_username" class="form-label">Usuário</label>
+                        <input type="text" name="username" class="form-control" id="id_username" required autofocus>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_password" class="form-label">Senha</label>
+                        <input type="password" name="password" class="form-control" id="id_password" required>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Entrar</button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer text-muted text-center small">
+                Acesso restrito a Agentes Comunitários.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

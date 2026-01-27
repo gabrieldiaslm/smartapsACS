@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-md-6 col-12">
+        <a href="{% url 'cadastrar_crianca' %}" class="btn-dashboard">
+            <i class="fa-solid fa-house-medical dashboard-icon"></i>
+            <span class="dashboard-label">Cadastrar Criança</span>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-12">
+        <a href="{% url 'calendario_guia' %}" class="btn-dashboard">
+            <i class="fa-solid fa-syringe dashboard-icon"></i>
+            <span class="dashboard-label">Calendário Vacinal (Guia)</span>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-12">
+        <a href="{% url 'lista_criancas' %}" class="btn-dashboard">
+            <i class="fa-solid fa-id-card dashboard-icon"></i>
+            <span class="dashboard-label">Cartão de Vacina</span>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-12">
+        <a href="{% url 'censo_demografico' %}" class="btn-dashboard"> <i class="fa-solid fa-users dashboard-icon"></i>
+            <span class="dashboard-label">Crianças</span>
+        </a>
+    </div>
+
+    {% if user.is_superuser %}
+    <div class="col-md-12 col-12 mt-3"> <div class="card border-0 shadow-sm" style="background-color: #f3e5f5; border-left: 5px solid #7b1fa2;">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="fw-bold" style="color: #4a148c;"><i class="fa-solid fa-user-shield"></i> Área Administrativa</h5>
+                    <p class="mb-0 text-muted small">Você tem permissões de administrador.</p>
+                </div>
+                
+                <a href="{% url 'cadastrar_acs' %}" class="btn btn-outline-dark" style="border-radius: 50px; border-color: #7b1fa2; color: #7b1fa2;">
+                    <i class="fa-solid fa-user-plus"></i> Criar Novo ACS
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

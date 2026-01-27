@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SMART APS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+<style>
+    :root {
+        /* CORES PRINCIPAIS (Invertidas) */
+        --primary-color: #E65100;    /* Laranja (Header, Botões Home) */
+        --primary-hover: #BF360C;    /* Laranja mais escuro (Hover) */
+        --secondary-blue: #233486;   /* Azul (Apenas para textos/detalhes) */
+        --bg-color: #F8F9FA;         /* Fundo Gelo */
+        
+        /* CORES DE STATUS (Mantidas) */
+        --status-atrasada-bg: #FFEBEE;
+        --status-atrasada-text: #D32F2F;
+        --status-atrasada-border: #EF5350;
+
+        --status-aplicada-bg: #E8F5E9;
+        --status-aplicada-text: #2E7D32;
+        --status-aplicada-border: #66BB6A;
+
+        --status-pendente-bg: #F5F5F5;
+        --status-pendente-text: #616161;
+        --status-pendente-border: #BDBDBD;
+    }
+
+    body { 
+        background-color: var(--bg-color); 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    /* 1. HEADER (Agora Laranja) */
+    .header-custom {
+        background-color: var(--primary-color); /* Laranja */
+        color: white;
+        padding: 15px 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+
+    .user-avatar {
+        background-color: white;
+        color: var(--primary-color); /* Ícone laranja */
+        border: 2px solid rgba(255,255,255,0.8);
+        width: 50px; height: 50px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; margin-right: 10px;
+    }
+
+    /* 2. BOTÕES DO DASHBOARD (Agora Laranja) */
+    .btn-dashboard {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 30px 20px;
+        width: 100%;
+        height: 140px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s, box-shadow 0.2s;
+        text-decoration: none;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 10px rgba(230, 81, 0, 0.3); /* Sombra alaranjada */
+    }
+
+    .btn-dashboard:hover {
+        transform: translateY(-3px);
+        background-color: var(--primary-hover); /* Laranja escuro no hover */
+        box-shadow: 0 8px 15px rgba(230, 81, 0, 0.4);
+        color: white;
+    }
+
+    .dashboard-icon { font-size: 2.5rem; margin-bottom: 10px; }
+    .dashboard-label { font-size: 1.1rem; font-weight: 600; }
+
+    /* 3. TÍTULOS E ÍCONES (Azul para contraste) */
+    h3, h4, h5, .text-primary {
+        color: var(--secondary-blue) !important; /* Mantém títulos em azul para leitura */
+    }
+
+    /* 4. BOTÃO DE VOLTAR */
+    .btn-voltar-destaque {
+        background-color: white;
+        color: var(--primary-color);
+        border: 1px solid #ddd;
+        font-weight: 600;
+        border-radius: 50px;
+        padding: 8px 20px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .btn-voltar-destaque:hover {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    /* 5. BOTÕES DE AÇÃO (Laranja também, para consistência) */
+    .btn-laranja {
+        background-color: var(--primary-color) !important;
+        color: white !important;
+        border: none;
+        font-weight: bold;
+    }
+    .btn-laranja:hover {
+        background-color: var(--primary-hover) !important;
+    }
+</style>
+</head>
+<body>
+
+    <div class="header-custom">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <div class="user-avatar">
+                    <i class="fa-solid fa-user-nurse"></i>
+                </div>
+                <div>
+                    <h5 class="m-0 fw-bold">SmartAPS</h5>
+                    <small>Olá, {{ user.username|default:"ACS" }}</small>
+                </div>
+            </div>
+            
+            <div class="d-flex gap-3">
+                <i class="fa-solid fa-bell fa-lg" style="cursor: pointer;"></i>
+                <form method="post" action="{% url 'logout' %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn p-0 border-0 bg-transparent text-white" title="Sair">
+                        <i class="fa-solid fa-right-from-bracket fa-lg"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

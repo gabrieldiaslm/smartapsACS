@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <a href="{% url 'index' %}" class="btn-voltar-destaque">
+        <i class="fa-solid fa-arrow-left"></i> Início
+    </a>
+    <h3 class="text-primary fw-bold m-0"><i class="fa-solid fa-chart-pie"></i> Censo</h3>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white text-center p-3 shadow-sm">
+            <h2 class="fw-bold m-0">{{ total }}</h2>
+            <small>Total de Crianças</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white text-center p-3 shadow-sm">
+            <h2 class="fw-bold m-0">{{ bebes }}</h2>
+            <small>Bebês (&lt;1 ano)</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-info text-center p-3 shadow-sm">
+            <h2 class="fw-bold m-0 text-info">{{ meninos }}</h2>
+            <small class="text-muted"><i class="fa-solid fa-mars"></i> Meninos</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-danger text-center p-3 shadow-sm">
+            <h2 class="fw-bold m-0 text-danger">{{ meninas }}</h2>
+            <small class="text-muted"><i class="fa-solid fa-venus"></i> Meninas</small>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white py-3">
+        <h5 class="m-0 fw-bold text-secondary"><i class="fa-solid fa-table-list"></i> Detalhamento da População</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover table-striped mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome da Criança</th>
+                    <th>Nascimento</th>
+                    <th>Idade Calculada</th>
+                    <th>Sexo</th>
+                    <th>Localidade/Bairro</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for crianca in criancas %}
+                <tr>
+                    <td class="fw-bold text-primary">{{ crianca.nome }}</td>
+                    <td>{{ crianca.data_nascimento|date:"d/m/Y" }}</td>
+                    
+                    <td>
+                        <span class="badge {% if crianca.data_nascimento|timesince|slice:':2'|add:'0' < 1 %}bg-warning text-dark{% else %}bg-light text-secondary border{% endif %}">
+                            {{ crianca.data_nascimento|timesince }}
+                        </span>
+                    </td>
+
+                    <td>
+                        {% if crianca.sexo == 'M' %}
+                            <i class="fa-solid fa-mars text-primary"></i> Masc
+                        {% else %}
+                            <i class="fa-solid fa-venus text-danger"></i> Fem
+                        {% endif %}
+                    </td>
+                    <td>{{ crianca.localidade }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center p-4">Nenhum registro encontrado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

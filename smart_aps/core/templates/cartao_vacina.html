@@ -1,0 +1,57 @@
+
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <a href="{% url 'lista_criancas' %}" class="btn-voltar-destaque">
+        <i class="fa-solid fa-arrow-left"></i> Voltar
+    </a>
+    <div class="text-end">
+        <h3 class="fw-bold text-primary m-0">{{ crianca.nome }}</h3>
+        <span class="badge bg-secondary">{{ crianca.data_nascimento|timesince }}</span>
+    </div>
+</div>
+
+{% regroup registros by vacina.nome as vacinas_agrupadas %}
+
+{% for grupo in vacinas_agrupadas %}
+<div class="vacina-row shadow-sm">
+    <div class="mb-3">
+        <h5 class="fw-bold mb-0" style="color: #2c3e50;">{{ grupo.grouper }}</h5>
+        <small class="text-muted">{{ grupo.list.0.vacina.descricao_doenca }}</small>
+    </div>
+
+    <div class="d-flex flex-wrap gap-3">
+        {% for registro in grupo.list %}
+        
+        <a href="{% url 'editar_registro' registro.id %}" class="dose-card status-{{ registro.status }}">
+            
+            <div class="small fw-bold mb-1">
+                {% if registro.status == 'ATRASADA' %}
+                    <i class="fa-solid fa-triangle-exclamation status-icon"></i> Atrasada
+                {% elif registro.status == 'APLICADA' %}
+                    <i class="fa-solid fa-circle-check status-icon"></i> Aplicada
+                {% else %}
+                    <i class="fa-regular fa-circle status-icon"></i> Em Aberto
+                {% endif %}
+            </div>
+
+            <span class="dose-title">{{ registro.vacina.dose_padrao|upper }}</span>
+
+            <div class="small opacity-75 mt-2">
+                {% if registro.status == 'APLICADA' %}
+                    Em: {{ registro.data_aplicacao|date:"d/m/Y" }}
+                {% else %}
+                    Idade: {{ registro.vacina.idade_alvo_meses }} meses
+                {% endif %}
+            </div>
+        </a>
+
+        {% endfor %}
+    </div>
+</div>
+{% empty %}
+<div class="alert alert-info">Nenhum registro encontrado.</div>
+{% endfor %}
+
+{% endblock %}
