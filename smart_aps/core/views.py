@@ -94,12 +94,14 @@ def cadastrar_crianca(request):
     
     return render(request, 'crianca_form.html', {'form': form})
 
-@never_cache
+# core/views.py
+
+
 @login_required
 def cartao_vacina(request, crianca_id):
     crianca = get_object_or_404(Crianca, pk=crianca_id)
     
-    # IMPORTANTE: Ordenamos por 'vacina__nome' primeiro para o regroup funcionar
+    # IMPORTANTE: A ordenação por 'vacina__nome' é OBRIGATÓRIA para o regroup funcionar
     registros = RegistroVacina.objects.filter(crianca=crianca)\
         .select_related('vacina')\
         .order_by('vacina__nome', 'vacina__idade_alvo_meses')

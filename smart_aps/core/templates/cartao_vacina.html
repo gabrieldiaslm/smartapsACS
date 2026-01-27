@@ -1,4 +1,3 @@
-
 {% extends 'base.html' %}
 
 {% block content %}
@@ -7,7 +6,7 @@
         <i class="fa-solid fa-arrow-left"></i> Voltar
     </a>
     <div class="text-end">
-        <h3 class="fw-bold text-primary m-0">{{ crianca.nome }}</h3>
+        <h3 class="fw-bold m-0" style="color: var(--secondary-blue);">{{ crianca.nome }}</h3>
         <span class="badge bg-secondary">{{ crianca.data_nascimento|timesince }}</span>
     </div>
 </div>
@@ -16,8 +15,8 @@
 
 {% for grupo in vacinas_agrupadas %}
 <div class="vacina-row shadow-sm">
-    <div class="mb-3">
-        <h5 class="fw-bold mb-0" style="color: #2c3e50;">{{ grupo.grouper }}</h5>
+    <div class="mb-3 border-bottom pb-2">
+        <h5 class="fw-bold mb-0" style="color: var(--secondary-blue);">{{ grupo.grouper }}</h5>
         <small class="text-muted">{{ grupo.list.0.vacina.descricao_doenca }}</small>
     </div>
 
@@ -26,23 +25,28 @@
         
         <a href="{% url 'editar_registro' registro.id %}" class="dose-card status-{{ registro.status }}">
             
-            <div class="small fw-bold mb-1">
+            <div class="status-header mb-2">
                 {% if registro.status == 'ATRASADA' %}
-                    <i class="fa-solid fa-triangle-exclamation status-icon"></i> Atrasada
+                    <i class="fa-solid fa-triangle-exclamation"></i> Atrasada
                 {% elif registro.status == 'APLICADA' %}
-                    <i class="fa-solid fa-circle-check status-icon"></i> Aplicada
+                    <i class="fa-solid fa-circle-check"></i> Aplicada
                 {% else %}
-                    <i class="fa-regular fa-circle status-icon"></i> Em Aberto
+                    <i class="fa-regular fa-circle"></i> Em Aberto
                 {% endif %}
             </div>
 
             <span class="dose-title">{{ registro.vacina.dose_padrao|upper }}</span>
 
-            <div class="small opacity-75 mt-2">
+            <div class="small opacity-75 mt-2 pt-2 border-top border-secondary-subtle">
                 {% if registro.status == 'APLICADA' %}
-                    Em: {{ registro.data_aplicacao|date:"d/m/Y" }}
+                    <span class="fw-bold">Aplicado em:</span><br> {{ registro.data_aplicacao|date:"d/m/Y" }}
                 {% else %}
-                    Idade: {{ registro.vacina.idade_alvo_meses }} meses
+                    <span class="fw-bold">Idade alvo:</span><br>
+                    {% if registro.vacina.idade_alvo_meses == 0 %}
+                        Ao nascer
+                    {% else %}
+                        {{ registro.vacina.idade_alvo_meses }} meses
+                    {% endif %}
                 {% endif %}
             </div>
         </a>
@@ -51,7 +55,92 @@
     </div>
 </div>
 {% empty %}
-<div class="alert alert-info">Nenhum registro encontrado.</div>
+<div class="alert alert-info text-center py-5">
+    <i class="fa-solid fa-folder-open fa-2x mb-3"></i><br>
+    Nenhum registro vacinal encontrado.
+</div>
 {% endfor %}
 
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ESTILOS ESPECÍFICOS PARA OS CARTÕES HORIZONTAIS */
+
+    /* Container da Vacina (Branco) */
+    .vacina-row {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    /* O Mini-Card da Dose individual */
+    .dose-card {
+        text-decoration: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        
+        /* Tamanho fixo para garantir alinhamento horizontal bonito */
+        min-width: 160px;
+        max-width: 220px;
+        flex: 1; 
+
+        border-radius: 8px;
+        padding: 15px;
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-width: 1px;
+        border-style: solid;
+    }
+
+    .dose-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    .dose-title {
+        font-weight: 800;
+        font-size: 1.1rem;
+        display: block;
+        margin-bottom: 5px;
+        color: inherit; /* Herda a cor do status */
+    }
+
+    .status-header {
+        font-size: 0.85rem;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    /* CORES (Idênticas às imagens de referência) */
+    
+    /* ATRASADA: Fundo vermelho claro, borda vermelha */
+    .status-ATRASADA {
+        background-color: var(--status-atrasada-bg); /* #FFEBEE */
+        border-color: var(--status-atrasada-border);
+        color: var(--status-atrasada-text);
+    }
+
+    /* APLICADA: Fundo verde claro, borda verde */
+    .status-APLICADA {
+        background-color: var(--status-aplicada-bg); /* #E8F5E9 */
+        border-color: var(--status-aplicada-border);
+        color: var(--status-aplicada-text);
+    }
+
+    /* PENDENTE: Fundo cinza/branco, borda cinza */
+    .status-PENDENTE {
+        background-color: #ffffff;
+        border-color: #ced4da;
+        color: #6c757d;
+    }
+    .status-PENDENTE:hover {
+        background-color: #f8f9fa;
+        border-color: var(--primary-color); /* Laranja no hover */
+    }
+</style>
 {% endblock %}
