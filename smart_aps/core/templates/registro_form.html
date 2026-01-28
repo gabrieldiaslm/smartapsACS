@@ -3,33 +3,55 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-8">
-        <div class="card border-primary">
+        <div class="card border-primary shadow-sm">
             <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    💉 Registrar Vacinação: {{ registro.vacina.nome }}
+                <h5 class="mb-0 fw-bold">
+                    <i class="fa-solid fa-syringe"></i> Registrar Vacinação
                 </h5>
             </div>
-            <div class="card-body">
-                <div class="alert alert-info">
-                    <strong>Paciente:</strong> {{ registro.crianca.nome }} <br>
-                    <strong>Vacina:</strong> {{ registro.vacina.nome }} ({{ registro.vacina.dose_padrao }})
+            
+            <div class="card-body p-4">
+                <div class="alert alert-info border-info" style="background-color: #e0f7fa;">
+                    <p class="mb-1"><strong>Paciente:</strong> {{ registro.crianca.nome }}</p>
+                    <p class="mb-0"><strong>Vacina:</strong> {{ registro.vacina.nome }} ({{ registro.vacina.dose_padrao }})</p>
                 </div>
 
                 <form method="post">
                     {% csrf_token %}
                     
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">Status</label>
                             {{ form.status }}
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Estratégia</label>
+                            {{ form.estrategia }}
+                        </div>
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">Data da Aplicação</label>
                             {{ form.data_aplicacao }}
                             {% if form.data_aplicacao.errors %}
                                 <div class="text-danger small">{{ form.data_aplicacao.errors }}</div>
                             {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="card bg-light border-0 mb-3">
+                        <div class="card-body py-3">
+                            <h6 class="text-muted text-uppercase fw-bold small mb-3">
+                                <i class="fa-solid fa-notes-medical"></i> Dados Clínicos
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label fw-bold small">Via de Administração</label>
+                                    {{ form.via_administracao }}
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label fw-bold small">Local de Aplicação</label>
+                                    {{ form.local_aplicacao }}
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -48,7 +70,7 @@
                         <label class="form-label fw-bold">Profissional que aplicou</label>
                         {{ form.profissional_aplicou }}
                         <div class="form-text text-muted small">
-                            <i class="fa-solid fa-user-check"></i> Selecione o ACS responsável pela aplicação.
+                            <i class="fa-solid fa-user-nurse"></i> Selecione quem realizou o procedimento.
                         </div>
                     </div>
 
@@ -57,9 +79,11 @@
                         {{ form.observacoes }}
                     </div>
 
-                    <div class="d-flex justify-content-end gap-2">
-                        <a href="{% url 'cartao_vacina' registro.crianca.id %}" class="btn btn-secondary">Voltar</a>
-                        <button type="submit" class="btn btn-primary">Salvar Registro</button>
+                    <div class="d-flex justify-content-end gap-2 mt-4 border-top pt-3">
+                        <a href="{% url 'cartao_vacina' registro.crianca.id %}" class="btn btn-secondary px-4">Voltar</a>
+                        <button type="submit" class="btn btn-primary px-4 fw-bold">
+                            <i class="fa-solid fa-save"></i> Salvar Registro
+                        </button>
                     </div>
                 </form>
             </div>

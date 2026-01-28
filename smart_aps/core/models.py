@@ -139,5 +139,46 @@ class RegistroVacina(models.Model):
         related_name='vacinas_aplicadas'
     )
 
+    # --- OPÇÕES DOS DROPDOWNS ---
+    ESTRATEGIAS = [
+        ('ROTINA', 'Rotina'),
+        ('CAMPANHA', 'Campanha'),
+        ('BLOQUEIO', 'Bloqueio'),
+        ('ESPECIAL', 'Especial'),
+    ]
+
+    VIAS = [
+        ('INTRAMUSCULAR', 'Intramuscular'),
+        ('ORAL', 'Oral'),
+        ('SUBCUTANEA', 'Subcutânea'),
+        ('INTRADERMICA', 'Intradérmica'),
+    ]
+
+    LOCAIS = [
+        ('VASTO_LATERAL_D', 'Vasto Lateral Direito (Coxa)'),
+        ('VASTO_LATERAL_E', 'Vasto Lateral Esquerdo (Coxa)'),
+        ('DELTOIDE_D', 'Deltoide Direito (Braço)'),
+        ('DELTOIDE_E', 'Deltoide Esquerdo (Braço)'),
+        ('GLUTEO_D', 'Glúteo Direito'),
+        ('GLUTEO_E', 'Glúteo Esquerdo'),
+        ('BOCA', 'Boca (Oral)'),
+        ('OUTROS', 'Outros'),
+    ]
+
+    # --- CAMPOS ---
+    # O parametro 'choices' é o que transforma o campo em Dropdown no Admin e no Form padrão
+    status = models.CharField(max_length=20, default='PENDENTE') # Vamos tratar isso no form
+    estrategia = models.CharField(max_length=20, choices=ESTRATEGIAS, default='ROTINA')
+    via_administracao = models.CharField(max_length=20, choices=VIAS, default='INTRAMUSCULAR')
+    local_aplicacao = models.CharField(max_length=20, choices=LOCAIS, blank=True, null=True)
+    
+    # Campos de texto livre (não são dropdown)
+    lote = models.CharField(max_length=50, blank=True, null=True)
+    fabricante = models.CharField(max_length=50, blank=True, null=True)
+    observacoes = models.TextField(blank=True, null=True)
+    
+    # Profissional (Será dropdown dinâmico no form)
+    profissional_aplicou = models.CharField(max_length=100, blank=True, null=True)
+
     def __str__(self):
         return f"{self.vacina.nome} - {self.crianca.nome}"
