@@ -11,7 +11,7 @@
     </div>
 </div>
 
-{% regroup registros by vacina.idade_alvo_meses as cronograma %}
+{% regroup registros by vacina.idade_formatada as cronograma %}
 
 {% for grupo in cronograma %}
 <div class="vacina-row shadow-sm position-relative">
@@ -21,11 +21,7 @@
     <div class="mb-3 border-bottom pb-2 d-flex align-items-center gap-2">
         <i class="fa-regular fa-clock text-muted"></i>
         <h5 class="fw-bold mb-0 text-dark">
-            {% if grupo.grouper == 0 %}
-                Ao Nascer
-            {% else %}
-                {{ grupo.grouper }} Meses
-            {% endif %}
+            {{ grupo.grouper }}
         </h5>
     </div>
 
@@ -43,7 +39,18 @@
                     <span class="text-danger fw-bold"><i class="fa-solid fa-triangle-exclamation"></i> Atrasada</span>
                 {% elif registro.status == 'APLICADA' %}
                     <span class="text-success fw-bold"><i class="fa-solid fa-check"></i> Aplicada</span>
-                    <div class="small text-muted">{{ registro.data_aplicacao|date:"d/m/Y" }}</div>
+                    
+                    <div class="small text-muted mt-1">
+                        {{ registro.data_aplicacao|date:"d/m/Y" }}
+                    </div>
+
+                    {% if registro.aplicado_por %}
+                        <div class="small text-primary border-top pt-1 mt-1" style="font-size: 0.75rem;">
+                            <i class="fa-solid fa-user-nurse"></i> 
+                            {{ registro.aplicado_por.first_name }} {{ registro.aplicado_por.last_name }}
+                        </div>
+                    {% endif %}
+
                 {% else %}
                     <span class="text-muted"><i class="fa-regular fa-circle"></i> Pendente</span>
                 {% endif %}

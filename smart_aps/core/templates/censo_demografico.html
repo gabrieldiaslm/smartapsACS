@@ -40,6 +40,50 @@
     </div>
 </div>
 
+<div class="card bg-light border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-center">
+            
+            <div class="col-md-4 col-12">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                    <input type="text" name="busca" class="form-control border-start-0 ps-0" placeholder="Buscar nome..." value="{{ request.GET.busca|default:'' }}">
+                </div>
+            </div>
+
+            <div class="col-md-2 col-6">
+                <select name="status" class="form-select" onchange="this.form.submit()">
+                    <option value="">Status: Todos</option>
+                    <option value="atrasada" {% if request.GET.status == 'atrasada' %}selected{% endif %}>⚠ Atrasados</option>
+                    <option value="em_dia" {% if request.GET.status == 'em_dia' %}selected{% endif %}>✅ Em dia</option>
+                </select>
+            </div>
+
+            <div class="col-md-2 col-6">
+                <select name="sexo" class="form-select" onchange="this.form.submit()">
+                    <option value="">Sexo: Ambos</option>
+                    <option value="M" {% if request.GET.sexo == 'M' %}selected{% endif %}>Meninos</option>
+                    <option value="F" {% if request.GET.sexo == 'F' %}selected{% endif %}>Meninas</option>
+                </select>
+            </div>
+
+            <div class="col-md-2 col-12">
+                <select name="ordem" class="form-select" onchange="this.form.submit()">
+                    <option value="idade_cresc" {% if request.GET.ordem == 'idade_cresc' %}selected{% endif %}>Mais novos</option>
+                    <option value="idade_dec" {% if request.GET.ordem == 'idade_dec' %}selected{% endif %}>Mais velhos</option>
+                    <option value="nome" {% if request.GET.ordem == 'nome' %}selected{% endif %}>Nome (A-Z)</option>
+                </select>
+            </div>
+
+            <div class="col-md-2 col-12 d-grid">
+                <a href="{% url 'censo_demografico' %}" class="btn btn-outline-secondary">
+                    <i class="fa-solid fa-filter-circle-xmark"></i> Limpar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card shadow-sm border-0">
     <div class="card-body p-0">
         <div class="table-responsive">

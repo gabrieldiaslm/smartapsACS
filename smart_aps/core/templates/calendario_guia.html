@@ -11,19 +11,15 @@
 <div class="card shadow-sm">
     <div class="card-body">
         
-        {% regroup vacinas by idade_alvo_meses as idade_list %}
+        {% regroup vacinas by idade_formatada as idade_list %}
 
         <div class="accordion" id="accordionVacinas">
             {% for idade in idade_list %}
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}">
-                        <strong class="me-2">
-                            {% if idade.grouper == 0 %}
-                                Ao Nascer
-                            {% else %}
-                                {{ idade.grouper }} Meses
-                            {% endif %}
+                        <strong class="me-2 text-dark">
+                            {{ idade.grouper }}
                         </strong>
                         <span class="badge bg-secondary">{{ idade.list|length }} vacina(s)</span>
                     </button>

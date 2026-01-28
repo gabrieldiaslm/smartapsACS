@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from django.db.models import Count, Q
 from django.contrib import messages # Para dar feedback visual
 from django.views.decorators.cache import never_cache
+
 def is_admin(user):
     return user.is_superuser
 
@@ -97,32 +98,26 @@ def cadastrar_crianca(request):
 # core/views.py
 
 
-@never_cache
-@login_required
 def cartao_vacina(request, crianca_id):
     crianca = get_object_or_404(Crianca, pk=crianca_id)
     
-    # === 1. LÓGICA DE ATUALIZAÇÃO AUTOMÁTICA ===
+    # Cálculo da idade
     hoje = date.today()
-    
-    # Calcula a idade da criança em meses
-    # Ex: (2026 - 2025) * 12 + (1 - 1) = 12 meses
     idade_meses = (hoje.year - crianca.data_nascimento.year) * 12 + (hoje.month - crianca.data_nascimento.month)
     
-    # Busca vacinas que NÃO foram aplicadas (Pendentes ou já Atrasadas)
-    registros_pendentes = RegistroVacina.objects.filter(crianca=crianca).exclude(status='APLICADA')
+    # OTIMIZAÇÃO:
+    # Em vez de trazer tudo e testar no Python, pedimos ao banco:
+    # "Me dê apenas as vacinas PENDENTES cuja idade alvo já PASSOU (é menor que a idade da criança)"
+    vacinas_vencidas = RegistroVacina.objects.filter(
+        crianca=crianca,
+        status='PENDENTE',
+        vacina__idade_alvo_meses__lt=idade_meses # __lt significa "Less Than" (menor que)
+    )
     
-    registros_para_atualizar = []
-    
-    for registro in registros_pendentes:
-        # Se a idade da criança passou da idade alvo E o status ainda não é 'ATRASADA'
-        if idade_meses > registro.vacina.idade_alvo_meses and registro.status != 'ATRASADA':
-            registro.status = 'ATRASADA'
-            registros_para_atualizar.append(registro)
-    
-    # Salva todos de uma vez (Performance otimizada)
-    if registros_para_atualizar:
-        RegistroVacina.objects.bulk_update(registros_para_atualizar, ['status'])
+    # Se houver alguma nessa condição, atualizamos direto
+    if vacinas_vencidas.exists():
+        # O 'update' roda um comando SQL direto, sem carregar objetos na memória um por um
+        vacinas_vencidas.update(status='ATRASADA')
         
     # === 2. BUSCA PARA EXIBIÇÃO (Já com dados atualizados) ===
     #    Ordenamos primeiro pela IDADE (cronológico) e depois pelo NOME
@@ -135,18 +130,42 @@ def cartao_vacina(request, crianca_id):
 @never_cache
 @login_required
 def editar_registro(request, registro_id):
-    """Atualizar status da vacina (Aplicar)"""
     registro = get_object_or_404(RegistroVacina, pk=registro_id)
     
+    # Prepara o nome do usuário atual para usar como padrão
+    nome_usuario_atual = f"{request.user.first_name} {request.user.last_name}".strip()
+    if not nome_usuario_atual:
+        nome_usuario_atual = request.user.username
+
     if request.method == 'POST':
         form = RegistroVacinaForm(request.POST, instance=registro)
+        
         if form.is_valid():
-            form.save()
+            aplicacao = form.save(commit=False)
+            
+            # NÃO PRECISA MAIS DEFINIR 'profissional_aplicou' AQUI
+            # O valor agora vem direto do formulário (dropdown)
+            
+            aplicacao.save()
+            messages.success(request, 'Registro atualizado com sucesso!')
             return redirect('cartao_vacina', crianca_id=registro.crianca.id)
     else:
-        form = RegistroVacinaForm(instance=registro)
-        
-    return render(request, 'registro_form.html', {'form': form, 'registro': registro})
+        # GET: Abre o form com valores iniciais
+        form = RegistroVacinaForm(
+            instance=registro, 
+            initial={
+                'status': 'APLICADA',
+                # Aqui definimos que o usuário logado vem selecionado por padrão
+                'profissional_aplicou': nome_usuario_atual 
+            }
+        )
+
+    context = {
+        'form': form,
+        'registro': registro,
+        'crianca': registro.crianca
+    }
+    return render(request, 'registro_form.html', context)
 
 @never_cache
 @login_required
@@ -159,34 +178,92 @@ def calendario_guia(request):
 @never_cache
 @login_required
 def censo_demografico(request):
-    """Card 4: Censo com estatísticas corrigidas e status"""
+    """Card 4: Censo com Filtros e Ordenação"""
     
-    # 1. A Lista Base
-    # O annotate verifica se existe ALGUM registro com status 'ATRASADA'
-    criancas = Crianca.objects.annotate(
-        tem_atraso=Count('registros', filter=Q(registros__status='ATRASADA'))
-    ).order_by('data_nascimento')
-
-    # 2. Cálculos Estatísticos (MÉTODO CORRIGIDO E SIMPLIFICADO)
-    # Usamos filter().count() direto para evitar erro de agrupamento
-    total = criancas.count()
-    meninos = criancas.filter(sexo='M').count()
-    meninas = criancas.filter(sexo='F').count()
-
-    # Conta bebês (< 1 ano)
+    # === 1. ESTATÍSTICAS GLOBAIS (Otimizadas) ===
+    # Calculamos isso INDEPENDENTE dos filtros, para o gestor sempre ver o tamanho da unidade
+    qs_base = Crianca.objects.all()
     um_ano_atras = date.today() - timedelta(days=365)
-    bebes = criancas.filter(data_nascimento__gt=um_ano_atras).count()
     
+    estatisticas = qs_base.aggregate(
+        total=Count('id'),
+        meninos=Count('id', filter=Q(sexo='M')),
+        meninas=Count('id', filter=Q(sexo='F')),
+        bebes=Count('id', filter=Q(data_nascimento__gt=um_ano_atras))
+    )
+
+    # === 2. LISTA FILTRÁVEL ===
+    # Começamos anotando os atrasos (necessário para filtrar por status)
+    lista_criancas = Crianca.objects.annotate(
+        tem_atraso=Count('registros', filter=Q(registros__status='ATRASADA'))
+    )
+
+    # --- A. Captura os parâmetros da URL ---
+    busca = request.GET.get('busca')
+    sexo = request.GET.get('sexo')
+    status = request.GET.get('status')
+    ordem = request.GET.get('ordem')
+
+    # --- B. Aplica Filtros ---
+    if busca:
+        lista_criancas = lista_criancas.filter(nome__icontains=busca)
+    
+    if sexo:
+        lista_criancas = lista_criancas.filter(sexo=sexo)
+        
+    if status == 'atrasada':
+        lista_criancas = lista_criancas.filter(tem_atraso__gt=0)
+    elif status == 'em_dia':
+        lista_criancas = lista_criancas.filter(tem_atraso=0)
+
+    # --- C. Aplica Ordenação ---
+    if ordem == 'nome':
+        lista_criancas = lista_criancas.order_by('nome')
+    elif ordem == 'idade_cresc': # Do mais novo para o mais velho
+        lista_criancas = lista_criancas.order_by('-data_nascimento')
+    elif ordem == 'idade_dec':   # Do mais velho para o mais novo
+        lista_criancas = lista_criancas.order_by('data_nascimento')
+    else:
+        # Padrão: Mais novos primeiro (Bebês no topo)
+        lista_criancas = lista_criancas.order_by('-data_nascimento')
+
     context = {
-        'criancas': criancas,
-        'total': total,
-        'meninos': meninos,
-        'meninas': meninas,
-        'bebes': bebes,
-        'criancas_maiores': total - bebes
+        'criancas': lista_criancas,
+        # Estatísticas globais mantidas
+        'total': estatisticas['total'],
+        'meninos': estatisticas['meninos'],
+        'meninas': estatisticas['meninas'],
+        'bebes': estatisticas['bebes'],
+        'criancas_maiores': (estatisticas['total'] or 0) - (estatisticas['bebes'] or 0)
     }
     
     return render(request, 'censo_demografico.html', context)
+
+@never_cache
+@login_required
+def confirmar_aplicacao(request, registro_id):
+    """Marca a vacina como aplicada e salva quem fez isso automaticamente"""
+    registro = get_object_or_404(RegistroVacina, pk=registro_id)
+    
+    if request.method == 'POST':
+        # 1. Marca como Aplicada
+        registro.status = 'APLICADA'
+        
+        # 2. Salva a data (pode vir do form ou ser hoje)
+        data_form = request.POST.get('data_aplicacao')
+        if data_form:
+            registro.data_aplicacao = data_form
+        else:
+            registro.data_aplicacao = date.today()
+            
+        # 3. A MÁGICA: Salva o usuário logado automaticamente
+        registro.aplicado_por = request.user
+        
+        registro.save()
+        messages.success(request, f'Vacina {registro.vacina.nome} registrada com sucesso!')
+        return redirect('cartao_vacina', crianca_id=registro.crianca.id)
+
+    return redirect('cartao_vacina', crianca_id=registro.crianca.id)
 
 @never_cache
 @user_passes_test(is_admin)

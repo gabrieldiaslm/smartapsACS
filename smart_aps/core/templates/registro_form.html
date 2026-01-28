@@ -20,33 +20,40 @@
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Status</label>
+                            <label class="form-label fw-bold">Status</label>
                             {{ form.status }}
                         </div>
+                        
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Data da Aplicação</label>
+                            <label class="form-label fw-bold">Data da Aplicação</label>
                             {{ form.data_aplicacao }}
+                            {% if form.data_aplicacao.errors %}
+                                <div class="text-danger small">{{ form.data_aplicacao.errors }}</div>
+                            {% endif %}
                         </div>
                     </div>
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Lote</label>
+                            <label class="form-label fw-bold">Lote</label>
                             {{ form.lote }}
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Fabricante</label>
+                            <label class="form-label fw-bold">Fabricante</label>
                             {{ form.fabricante }}
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Profissional que aplicou</label>
+                        <label class="form-label fw-bold">Profissional que aplicou</label>
                         {{ form.profissional_aplicou }}
+                        <div class="form-text text-muted small">
+                            <i class="fa-solid fa-user-check"></i> Selecione o ACS responsável pela aplicação.
+                        </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Observações</label>
+                        <label class="form-label fw-bold">Observações</label>
                         {{ form.observacoes }}
                     </div>
 

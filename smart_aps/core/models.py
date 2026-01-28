@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
+from django.conf import settings
 
 # 1. Usuário (ACS)
 # Usaremos o sistema de auth padrão do Django, mas podemos estender se precisar de mais dados do ACS (como número da equipe).
@@ -32,6 +33,16 @@ class Crianca(models.Model):
     criado_em = models.DateTimeField(auto_now_add=True)
     cadastrado_por = models.ForeignKey(UsuarioACS, on_delete=models.SET_NULL, null=True)
 
+    class Meta:
+        ordering = ['nome']
+        # Cria "atalhos" para o banco de dados encontrar esses dados instantaneamente
+        indexes = [
+            models.Index(fields=['nome']),             # Usado na busca
+            models.Index(fields=['data_nascimento']),  # Usado no Censo (cálculo de bebês)
+            models.Index(fields=['sexo']),             # Usado no Censo (meninos/meninas)
+            models.Index(fields=['cns']),              # Usado na busca
+        ]
+
     def __str__(self):
         return f"{self.nome} ({self.data_nascimento})"
 
@@ -48,10 +59,42 @@ class Vacina(models.Model):
     def __str__(self):
         meses = f"{self.idade_alvo_meses} meses" if self.idade_alvo_meses > 0 else "Ao nascer"
         return f"{self.nome} - {self.dose_padrao}"
+    
+    @property
+    def idade_formatada(self):
+        """
+        Converte meses em 'Anos' ou 'Anos e Meses'.
+        Ex: 15 meses -> 1 Ano e 3 Meses
+        Ex: 114 meses -> 9 Anos e 6 Meses
+        """
+        if self.idade_alvo_meses == 0:
+            return "Ao Nascer"
+        
+        # Se for menos de 1 ano (ex: 2, 4, 9 meses), mantém meses
+        if self.idade_alvo_meses < 12:
+            return f"{self.idade_alvo_meses} Meses"
+        
+        # Calcula Anos e Meses restantes
+        anos = self.idade_alvo_meses // 12
+        meses_restantes = self.idade_alvo_meses % 12
+        
+        # Define singular ou plural para "Ano"
+        texto_anos = "Ano" if anos == 1 else "Anos"
+        
+        # Lógica de Exibição
+        if meses_restantes == 0:
+            # Ex: 12, 24, 48 -> "1 Ano", "2 Anos"
+            return f"{anos} {texto_anos}"
+        else:
+            # Ex: 15, 114 -> "1 Ano e 3 Meses", "9 Anos e 6 Meses"
+            return f"{anos} {texto_anos} e {meses_restantes} Meses"
 
 # 4. Cartão de Vacina (O Registro da Aplicação)
 class RegistroVacina(models.Model):
+    lote = models.CharField(max_length=50, blank=True, null=True) 
+    observacao = models.TextField(blank=True, null=True)
     
+
     STATUS_CHOICES = [
         ('PENDENTE', 'Em Aberto'),
         ('ATRASADA', 'Atrasada'), # Isso pode ser calculado dinamicamente também
@@ -81,6 +124,20 @@ class RegistroVacina(models.Model):
     via_administracao = models.CharField(max_length=30, choices=VIA_CHOICES, blank=True)
     local_aplicacao = models.CharField(max_length=100, blank=True) # Ex: Deltoide direito
     estrategia = models.CharField(max_length=100, default="Rotina") # Rotina ou Campanha
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['status']), # Muito usado para contar atrasos
+        ]
+    
+    # NOVO CAMPO:
+    aplicado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, # Aponta para o seu UsuarioACS
+        on_delete=models.SET_NULL, # Se o usuário for demitido/deletado, o registro fica mas sem nome
+        null=True, 
+        blank=True,
+        related_name='vacinas_aplicadas'
+    )
 
     def __str__(self):
         return f"{self.vacina.nome} - {self.crianca.nome}"
