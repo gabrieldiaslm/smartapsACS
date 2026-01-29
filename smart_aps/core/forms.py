@@ -1,4 +1,3 @@
-# atencao_primaria/forms.py
 from django import forms
 from .models import Crianca, RegistroVacina, UsuarioACS
 from django.contrib.auth.forms import UserCreationForm
@@ -25,7 +24,8 @@ class CriancaForm(forms.ModelForm):
 
 # --- NOVO FORMULÁRIO ESPECÍFICO PARA APLICAÇÃO ---
 class RegistroVacinaForm(forms.ModelForm):
-    # 1. FORÇAR OPÇÕES DE STATUS (Correção para o menu em branco)
+
+    # Mantemos a correção do Status para garantir as opções
     status = forms.ChoiceField(
         label="Situação / Status",
         choices=[
@@ -36,14 +36,9 @@ class RegistroVacinaForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-    # 2. CAMPO EXTRA DE PROFISSIONAL
-    profissional_aplicou = forms.ChoiceField(
-        label="Profissional que Aplicou",
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-
     class Meta:
         model = RegistroVacina
+        # LISTA DE CAMPOS
         fields = [
             'status', 
             'estrategia', 
@@ -52,16 +47,13 @@ class RegistroVacinaForm(forms.ModelForm):
             'local_aplicacao', 
             'lote', 
             'fabricante', 
-            'profissional_aplicou', 
             'observacoes'
         ]
         
         widgets = {
-            # status e profissional_aplicou já foram definidos acima manualmente
             'estrategia': forms.Select(attrs={'class': 'form-select'}),
             'via_administracao': forms.Select(attrs={'class': 'form-select'}),
             'local_aplicacao': forms.Select(attrs={'class': 'form-select'}),
-            
             'data_aplicacao': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'lote': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Lote 1234'}),
             'fabricante': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Fiocruz/Butantan'}),
@@ -81,22 +73,11 @@ class RegistroVacinaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(RegistroVacinaForm, self).__init__(*args, **kwargs)
         
-        # 1. Data Padrão (Hoje)
+        # Data padrão: Hoje
         if not self.initial.get('data_aplicacao'):
             self.initial['data_aplicacao'] = date.today()
 
-        # 2. POPULAR A LISTA DE PROFISSIONAIS (DINÂMICO)
-        usuarios = UsuarioACS.objects.all().order_by('first_name')
-        lista_profissionais = []
-        for u in usuarios:
-            nome_completo = f"{u.first_name} {u.last_name}".strip()
-            if not nome_completo:
-                nome_completo = u.username
-            lista_profissionais.append((nome_completo, nome_completo))
-            
-        self.fields['profissional_aplicou'].choices = lista_profissionais
-
-        # 3. DEFINIR OBRIGATORIEDADE
+        # Obrigatórios
         self.fields['data_aplicacao'].required = True
         self.fields['lote'].required = True
         self.fields['fabricante'].required = True

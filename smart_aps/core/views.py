@@ -132,32 +132,20 @@ def cartao_vacina(request, crianca_id):
 def editar_registro(request, registro_id):
     registro = get_object_or_404(RegistroVacina, pk=registro_id)
     
-    # Prepara o nome do usuário atual para usar como padrão
-    nome_usuario_atual = f"{request.user.first_name} {request.user.last_name}".strip()
-    if not nome_usuario_atual:
-        nome_usuario_atual = request.user.username
-
     if request.method == 'POST':
         form = RegistroVacinaForm(request.POST, instance=registro)
         
         if form.is_valid():
-            aplicacao = form.save(commit=False)
+            # Salva direto! Não precisamos mais do commit=False para inserir usuário
+            form.save()
             
-            # NÃO PRECISA MAIS DEFINIR 'profissional_aplicou' AQUI
-            # O valor agora vem direto do formulário (dropdown)
-            
-            aplicacao.save()
             messages.success(request, 'Registro atualizado com sucesso!')
             return redirect('cartao_vacina', crianca_id=registro.crianca.id)
     else:
-        # GET: Abre o form com valores iniciais
+        # GET: Abre o form. Se quiser sugerir 'APLICADA', mantenha o initial.
         form = RegistroVacinaForm(
             instance=registro, 
-            initial={
-                'status': 'APLICADA',
-                # Aqui definimos que o usuário logado vem selecionado por padrão
-                'profissional_aplicou': nome_usuario_atual 
-            }
+            initial={'status': 'APLICADA'} 
         )
 
     context = {

@@ -6,7 +6,6 @@ from .models import UsuarioACS, Crianca, Vacina, RegistroVacina
 admin.site.register(UsuarioACS, UserAdmin)
 
 # 2. Registra a Criança
-# CORREÇÃO: Usar admin.ModelAdmin em vez de admin.site.ModelAdmin
 @admin.register(Crianca)
 class CriancaAdmin(admin.ModelAdmin):
     list_display = ('nome', 'data_nascimento', 'nome_mae', 'cns')
