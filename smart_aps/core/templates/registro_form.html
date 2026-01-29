@@ -81,4 +81,94 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // IDs gerados automaticamente pelo Django (id_nome_do_campo)
+        const loteSelect = document.getElementById('id_lote');
+        const fabSelect = document.getElementById('id_fabricante');
+        
+        // ID da vacina para buscar na API
+        const vacinaId = "{{ registro.vacina.id }}";
+        
+        // Variável para guardar os dados da API
+        let dadosEstoque = [];
+    
+        // 1. Carregar dados da API
+        fetch(`/api/lotes/${vacinaId}/`)
+            .then(response => response.json())
+            .then(data => {
+                dadosEstoque = data;
+                inicializarDropdowns();
+            })
+            .catch(error => console.error('Erro ao buscar lotes:', error));
+    
+        function inicializarDropdowns() {
+            // Salva o valor atual caso esteja editando
+            const loteAtual = loteSelect.value;
+            const fabAtual = fabSelect.value;
+
+            // Limpa os dropdowns mantendo a opção vazia
+            loteSelect.innerHTML = '<option value="">Selecione o Lote...</option>';
+            fabSelect.innerHTML = '<option value="">Selecione o Fabricante...</option>';
+    
+            let fabricantesUnicos = new Set();
+    
+            dadosEstoque.forEach(item => {
+                // Preenche Lotes
+                // Adicionamos o atributo 'data-fab' para saber quem é o fabricante desse lote
+                loteSelect.innerHTML += `<option value="${item.numero_lote}" data-fab="${item.fabricante}">${item.numero_lote}</option>`;
+                
+                // Coleta Fabricantes únicos
+                fabricantesUnicos.add(item.fabricante);
+            });
+    
+            // Preenche Fabricantes
+            fabricantesUnicos.forEach(fab => {
+                fabSelect.innerHTML += `<option value="${fab}">${fab}</option>`;
+            });
+
+            // Se for edição, tenta selecionar os valores que já estavam
+            if(loteAtual) loteSelect.value = loteAtual;
+            if(fabAtual) fabSelect.value = fabAtual;
+        }
+    
+        // 2. Lógica: Quando mudar o FABRICANTE -> Filtra os Lotes
+        fabSelect.addEventListener('change', function() {
+            const fabSelecionado = this.value;
+            
+            // Limpa lotes
+            loteSelect.innerHTML = '<option value="">Selecione o Lote...</option>';
+    
+            dadosEstoque.forEach(item => {
+                // Só adiciona o lote se o fabricante bater OU se nenhum fabricante foi selecionado
+                if (fabSelecionado === "" || item.fabricante === fabSelecionado) {
+                    loteSelect.innerHTML += `<option value="${item.numero_lote}" data-fab="${item.fabricante}">${item.numero_lote}</option>`;
+                }
+            });
+        });
+    
+        // 3. Lógica: Quando mudar o LOTE -> Trava o Fabricante
+        loteSelect.addEventListener('change', function() {
+            const loteSelecionado = this.value;
+            
+            // Se escolheu um lote
+            if (loteSelecionado) {
+                // Pega a opção selecionada no HTML
+                const optionSelecionada = this.options[this.selectedIndex];
+                // Pega o fabricante salvo no atributo 'data-fab'
+                const fabricanteDoLote = optionSelecionada.getAttribute('data-fab');
+                
+                if (fabricanteDoLote) {
+                    fabSelect.value = fabricanteDoLote;
+                }
+            } else {
+                // Se limpou o lote, reseta o filtro de fabricante (opcional)
+                fabSelect.value = "";
+                // Dispara o evento de change do fabricante para resetar a lista de lotes
+                fabSelect.dispatchEvent(new Event('change'));
+            }
+        });
+    });
+</script>
 {% endblock %}

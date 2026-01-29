@@ -38,16 +38,9 @@ class RegistroVacinaForm(forms.ModelForm):
 
     class Meta:
         model = RegistroVacina
-        # LISTA DE CAMPOS
         fields = [
-            'status', 
-            'estrategia', 
-            'data_aplicacao', 
-            'via_administracao', 
-            'local_aplicacao', 
-            'lote', 
-            'fabricante', 
-            'observacoes'
+            'status', 'estrategia', 'data_aplicacao', 'via_administracao', 
+            'local_aplicacao', 'lote', 'fabricante', 'observacoes'
         ]
         
         widgets = {
@@ -55,8 +48,8 @@ class RegistroVacinaForm(forms.ModelForm):
             'via_administracao': forms.Select(attrs={'class': 'form-select'}),
             'local_aplicacao': forms.Select(attrs={'class': 'form-select'}),
             'data_aplicacao': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'lote': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Lote 1234'}),
-            'fabricante': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Fiocruz/Butantan'}),
+            'lote': forms.Select(attrs={'class': 'form-select', 'id': 'id_lote'}),
+            'fabricante': forms.Select(attrs={'class': 'form-select', 'id': 'id_fabricante'}),
             'observacoes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
         
@@ -85,3 +78,13 @@ class RegistroVacinaForm(forms.ModelForm):
         self.fields['via_administracao'].required = True
         self.fields['local_aplicacao'].required = True
         self.fields['observacoes'].required = False
+
+        # Isso evita erro de validação do Django dizendo "Opção inválida"
+        # pois o Select tecnicamente está vazio no Python, mas cheio no HTML
+        self.fields['lote'].widget.choices = [] 
+        self.fields['fabricante'].widget.choices = []
+        
+        # Truque: Se já tiver dados (edição), preenche as opções iniciais
+        if self.instance.pk:
+            self.fields['lote'].widget.choices = [(self.instance.lote, self.instance.lote)]
+            self.fields['fabricante'].widget.choices = [(self.instance.fabricante, self.instance.fabricante)]

@@ -91,63 +91,103 @@
                 <thead class="table-light">
                     <tr>
                         <th>Nome da Criança</th>
-                        <th>Bairro / Localidade</th> <th>Idade</th>
+                        <th>Bairro / Localidade</th> 
+                        <th>Idade</th>
                         <th class="text-center">Sexo</th>
-                        <th class="text-center">Status</th> <th class="text-end">Ações</th>
+                        <th class="text-center">Status</th> 
+                        <th class="text-end">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for crianca in criancas %}
-                    <tr>
-                        <td class="fw-bold text-primary text-nowrap">
-                            {{ crianca.nome }}
-                        </td>
-                        
-                        <td>
-                            <span class="text-muted small">
-                                </i> {{ crianca.localidade|default:"-" }}
-                            </span>
-                        </td>
-                        
-                        <td>{{ crianca.data_nascimento|timesince }}</td>
-                        
-                        <td class="text-center">
-                            {% if crianca.sexo == 'M' %}
-                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">M</span>
-                            {% else %}
-                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle">F</span>
-                            {% endif %}
-                        </td>
+                        <tr>
+                            <td class="fw-bold">{{ crianca.nome }}</td>
+                            
+                            <td>{{ crianca.localidade|default:"-" }}</td>
 
-                        <td class="text-center">
-                            {% if crianca.tem_atraso > 0 %}
-                                <span class="badge bg-danger shadow-sm">
-                                    <i class="fa-solid fa-triangle-exclamation"></i> Atrasado
-                                </span>
-                            {% else %}
-                                <span class="badge bg-success shadow-sm opacity-50">Em dia</span>
-                            {% endif %}
-                        </td>
+                            <td>{{ crianca.idade_formatada }}</td>
+                            
+                            <td class="text-center">
+                                {% if crianca.sexo == 'M' %}
+                                    <span class="text-primary fw-bold small"><i class="fa-solid fa-mars"></i> Masc</span>
+                                {% else %}
+                                    <span class="text-danger fw-bold small"><i class="fa-solid fa-venus"></i> Fem</span>
+                                {% endif %}
+                            </td>
 
-                        <td class="text-end">
-                            <a href="{% url 'cartao_vacina' crianca.id %}" class="btn btn-sm btn-outline-secondary" title="Abrir Cartão">
-                                <i class="fa-solid fa-folder-open"></i>
-                            </a>
-                        </td>
-                    </tr>
+                            <td class="text-center">
+                                {% if crianca.status_geral == 'ATRASADO' %}
+                                    <span class="badge bg-danger">
+                                        <i class="fa-solid fa-triangle-exclamation"></i> Atrasado
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-success">
+                                        <i class="fa-solid fa-check-circle"></i> Em dia
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <td class="text-end">
+                                <a href="{% url 'cartao_vacina' crianca.id %}" class="btn btn-sm btn-primary fw-bold">
+                                    <i class="fa-solid fa-book-medical"></i> Abrir Cartão
+                                </a>
+                            </td>
+                        </tr>
                     {% empty %}
-                    <tr>
-                        <td colspan="6" class="text-center py-5 text-muted">
-                            Nenhum registro encontrado.
-                        </td>
-                    </tr>
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">
+                                Nenhuma criança encontrada com esses filtros.
+                            </td>
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
-    <div class="card-footer bg-white text-muted small">
-        Visualizando {{ criancas.count }} registros
+    
+    <div class="card-footer bg-white text-muted small d-flex justify-content-between align-items-center">
+        <div>
+            Total de registros encontrados: <strong>{{ criancas.paginator.count }}</strong>
+        </div>
+        <div>
+            Página {{ criancas.number }} de {{ criancas.paginator.num_pages }}
+        </div>
     </div>
 </div>
+
+{% if criancas.has_other_pages %}
+<nav aria-label="Navegação de página" class="mt-4">
+    <ul class="pagination justify-content-center">
+        
+        {% if criancas.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ criancas.previous_page_number }}&busca={{ request.GET.busca }}&status={{ request.GET.status }}&sexo={{ request.GET.sexo }}&ordem={{ request.GET.ordem }}">
+                    <i class="fa-solid fa-chevron-left"></i> Anterior
+                </a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link"><i class="fa-solid fa-chevron-left"></i> Anterior</span>
+            </li>
+        {% endif %}
+
+        <li class="page-item disabled">
+            <span class="page-link text-dark fw-bold">{{ criancas.number }}</span>
+        </li>
+
+        {% if criancas.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ criancas.next_page_number }}&busca={{ request.GET.busca }}&status={{ request.GET.status }}&sexo={{ request.GET.sexo }}&ordem={{ request.GET.ordem }}">
+                    Próxima <i class="fa-solid fa-chevron-right"></i>
+                </a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">Próxima <i class="fa-solid fa-chevron-right"></i></span>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
 {% endblock %}

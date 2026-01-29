@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
 from django.conf import settings
+from datetime import date
 
 # 1. Usuário (ACS)
 # Usaremos o sistema de auth padrão do Django, mas podemos estender se precisar de mais dados do ACS (como número da equipe).
@@ -42,6 +43,62 @@ class Crianca(models.Model):
             models.Index(fields=['sexo']),             # Usado no Censo (meninos/meninas)
             models.Index(fields=['cns']),              # Usado na busca
         ]
+
+
+    @property
+    def idade_em_meses(self):
+        hoje = date.today()
+        # Cálculo matemático preciso de meses
+        meses = (hoje.year - self.data_nascimento.year) * 12 + (hoje.month - self.data_nascimento.month)
+        return meses
+
+    # 2. O "Robô" que atualiza os atrasos
+    def verificar_atrasos(self):
+        # 1. Calculamos a idade em meses
+        hoje = date.today()
+        idade_meses = (hoje.year - self.data_nascimento.year) * 12 + (hoje.month - self.data_nascimento.month)
+        
+        # 2. Acessamos a lista reversa usando o related_name 'registros_vacina'
+        # Isso traduz para: "Django, pegue todos os registros onde crianca_id sou EU"
+        registros_pendentes = self.registros.filter(status='PENDENTE')
+        
+        for registro in registros_pendentes:
+            if idade_meses > registro.vacina.idade_alvo_meses:
+                registro.status = 'ATRASADA'
+                registro.save()
+    
+    @property
+    def status_geral(self):
+        # Se tiver QUALQUER vacina marcada como atrasada, o status geral é RUIM
+        if self.registros.filter(status='ATRASADA').exists():
+            return 'ATRASADO'
+        return 'EM_DIA'
+    
+    @property
+    def idade_formatada(self):
+        """
+        Retorna uma string amigável:
+        - "2 meses"
+        - "1 ano"
+        - "1 ano e 5 meses"
+        """
+        total_meses = self.idade_em_meses
+        
+        if total_meses < 12:
+            return f"{total_meses} meses"
+        
+        anos = total_meses // 12
+        meses_restantes = total_meses % 12
+        
+        if meses_restantes == 0:
+            if anos == 1:
+                return "1 ano"
+            return f"{anos} anos"
+        
+        msg_anos = "1 ano" if anos == 1 else f"{anos} anos"
+        msg_meses = "1 mês" if meses_restantes == 1 else f"{meses_restantes} meses"
+        
+        return f"{msg_anos} e {msg_meses}"
 
     def __str__(self):
         return f"{self.nome} ({self.data_nascimento})"
@@ -182,3 +239,17 @@ class RegistroVacina(models.Model):
 
     def __str__(self):
         return f"{self.vacina.nome} - {self.crianca.nome}"
+    
+class LoteVacina(models.Model):
+    vacina = models.ForeignKey(Vacina, on_delete=models.CASCADE, related_name='lotes')
+    numero_lote = models.CharField(max_length=50)
+    fabricante = models.CharField(max_length=100)
+    quantidade_disponivel = models.IntegerField(default=0) # Opcional, mas útil
+    validade = models.DateField(blank=True, null=True)     # Opcional
+
+    def __str__(self):
+        return f"{self.vacina.nome} - Lote: {self.numero_lote} ({self.fabricante})"
+
+    class Meta:
+        verbose_name = "Lote Disponível"
+        verbose_name_plural = "Lotes Disponíveis"
