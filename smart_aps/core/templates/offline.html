@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="text-center mt-5">
+    <div class="text-danger mb-3">
+        <i class="fa-solid fa-wifi fa-4x"></i>
+    </div>
+    <h2 class="fw-bold">Você está offline</h2>
+    <p class="lead text-muted">
+        Não conseguimos conectar ao servidor do Smart APS.<br>
+        Verifique sua conexão e tente novamente.
+    </p>
+    <a href="/" class="btn btn-primary mt-3">
+        <i class="fa-solid fa-rotate"></i> Tentar Reconectar
+    </a>
+</div>
+{% endblock %}

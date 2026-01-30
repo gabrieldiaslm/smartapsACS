@@ -316,3 +316,6 @@ def lista_usuarios(request):
     usuarios = UsuarioACS.objects.filter(is_superuser=False).order_by('first_name')
     
     return render(request, 'lista_usuarios.html', {'usuarios': usuarios})
+
+def offline_view(request):
+    return render(request, 'offline.html')

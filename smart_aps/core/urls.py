@@ -1,6 +1,7 @@
 # core/urls.py
 from django.urls import path
 from . import views
+from core.views import offline_view
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -12,5 +13,6 @@ urlpatterns = [
     path('censo/', views.censo_demografico, name='censo_demografico'), # Card 4 (Relatório/Planilha)
     path('gestao/novo-acs/', views.cadastrar_acs, name='cadastrar_acs'),
     path('gestao/equipe/', views.lista_usuarios, name='lista_usuarios'), # NOVA ROTA
+    path('offline/', offline_view, name='offline'),
     
 ]

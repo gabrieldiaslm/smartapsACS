@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'core',
+    'pwa',
 
 ]
 
@@ -113,3 +114,27 @@ STATIC_URL = 'static/'
 # Redirecionamento após Login e Logout
 LOGIN_REDIRECT_URL = 'index'  # Nome da rota da sua página inicial
 LOGOUT_REDIRECT_URL = 'login' # Para onde vai quando sair
+
+# CONFIGURAÇÕES DO PWA (Smart APS Mobile)
+PWA_APP_NAME = 'Smart APS'
+PWA_APP_DESCRIPTION = "Sistema de Controle de Vacinação"
+PWA_THEME_COLOR = '#0d6efd' # Azul Bootstrap (cor da barra de status do Android)
+PWA_BACKGROUND_COLOR = '#ffffff'
+PWA_DISPLAY = 'standalone' # Isso faz sumir a barra do navegador (vira app mesmo)
+PWA_SCOPE = '/'
+PWA_START_URL = '/' # Quando abrir o app, vai pra Home
+
+# Ícones (Você precisará colocar uma imagem logo.png na pasta static/images)
+PWA_APP_ICONS = [
+    {
+        'src': '/static/images/wip.jpg',
+        'sizes': '192x192'
+    }
+]
+PWA_APP_ICONS_APPLE = [
+    {
+        'src': '/static/images/wip.jpg',
+        'sizes': '512x512'
+    }
+]
+PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'core/static/js/serviceworker.js')
