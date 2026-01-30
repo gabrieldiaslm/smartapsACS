@@ -223,8 +223,39 @@ def censo_demografico(request):
         tem_atraso=Count('registros', filter=Q(registros__status='ATRASADA'))
     )
 
-    # ... (Seus filtros de busca, sexo, status e ordem continuam iguais) ...
-    # Se quiser que eu repita os filtros, me avise, mas a lógica é a mesma.
+    # Captura dados da URL
+    busca = request.GET.get('busca')
+    status = request.GET.get('status')
+    sexo = request.GET.get('sexo')
+    ordem = request.GET.get('ordem')
+
+    # --- LÓGICA DE FILTRAGEM ---
+    if busca:
+        print(f"Filtrando nome por: {busca}")
+        lista_criancas = lista_criancas.filter(nome__icontains=busca)
+    
+    if status == 'atrasada':
+        print("Filtrando por: ATRASADOS")
+        # Pega quem tem contagem de atrasos > 0
+        lista_criancas = lista_criancas.filter(tem_atraso__gt=0)
+    elif status == 'em_dia':
+        print("Filtrando por: EM DIA")
+        # Pega quem tem contagem de atrasos == 0
+        lista_criancas = lista_criancas.filter(tem_atraso=0)
+
+    if sexo:
+        print(f"Filtrando sexo por: {sexo}")
+        lista_criancas = lista_criancas.filter(sexo=sexo)
+
+    # --- ORDENAÇÃO ---
+    if ordem == 'nome':
+        lista_criancas = lista_criancas.order_by('nome')
+    elif ordem == 'idade_cresc':
+        lista_criancas = lista_criancas.order_by('-data_nascimento')
+    elif ordem == 'idade_dec':
+        lista_criancas = lista_criancas.order_by('data_nascimento')
+    else:
+        lista_criancas = lista_criancas.order_by('-data_nascimento')
 
     # Contexto final
     context = {
@@ -235,21 +266,19 @@ def censo_demografico(request):
         'bebes': estatisticas['bebes'],
         'criancas_maiores': (estatisticas['total'] or 0) - (estatisticas['bebes'] or 0)
     }
-    # lista_criancas é o seu resultado final filtrado
     
     # === PAGINAÇÃO ===
-    paginator = Paginator(lista_criancas, 20) # Mostra 20 por página
+    paginator = Paginator(lista_criancas, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # === 5. CONTEXTO FINAL (AQUI ESTAVA O PROBLEMA) ===
+    # 5. CONTEXTO FINAL
     context = {
         'criancas': page_obj,
-        # Precisamos passar explicitamente cada dado da estatística para o template
         'total': estatisticas['total'],
-        'meninos': estatisticas['meninos'],  # <--- Faltava passar isso
-        'meninas': estatisticas['meninas'],  # <--- E isso
-        'bebes': estatisticas['bebes'],      # <--- E isso
+        'meninos': estatisticas['meninos'], 
+        'meninas': estatisticas['meninas'],
+        'bebes': estatisticas['bebes'],      
     }
     return render(request, 'censo_demografico.html', context)
 
@@ -270,7 +299,7 @@ def confirmar_aplicacao(request, registro_id):
         else:
             registro.data_aplicacao = date.today()
             
-        # 3. A MÁGICA: Salva o usuário logado automaticamente
+        # 3. Salva o usuário logado automaticamente
         registro.aplicado_por = request.user
         
         registro.save()
