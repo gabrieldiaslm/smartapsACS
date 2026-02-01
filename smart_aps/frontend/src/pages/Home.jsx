@@ -46,7 +46,7 @@ function Home() {
             </div>
 
             <div className="col-md-6">
-            <Link to="/lista" className="card shadow-sm hover-effect" style={cardStyle}>
+            <Link to="/censo" className="card shadow-sm hover-effect" style={cardStyle}>
                 <i className="fa-solid fa-users fa-3x mb-2"></i>
                 <h4 className="fw-bold">Crianças</h4>
             </Link>

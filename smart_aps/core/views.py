@@ -12,7 +12,8 @@ from django.core.paginator import Paginator
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
 from .serializers import CriancaSerializer, RegistroVacinaSerializer
-
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 def api_lotes_por_vacina(request, vacina_id):
     # ADICIONADO: 'quantidade_disponivel' é obrigatório para o React exibir a lista
@@ -334,38 +335,68 @@ def offline_view(request):
 
 class CriancaViewSet(viewsets.ModelViewSet):
     """
-    API completa para gerenciar Crianças.
-    O React vai bater aqui para pegar JSON.
+    API Power-Up para o Censo Demográfico
     """
-    # 1. Qual é a fonte de dados?
-    queryset = Crianca.objects.all().order_by('-id')
-    
-    # 2. Qual é o tradutor?
     serializer_class = CriancaSerializer
     
-    # 3. Filtros e Busca (Igual ao seu Censo, mas automático)
+    # Mantemos os filtros padrões do Django REST Framework
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    
-    # Habilita busca por texto (?search=Joao)
     search_fields = ['nome', 'cns', 'nome_mae']
-    
-    # Habilita filtros exatos (?sexo=M)
     filterset_fields = ['sexo', 'localidade']
 
-    # Opcional: Replicar o "Robô de Atrasos" na API
-    # Toda vez que a API listar crianças, ela verifica atrasos antes
     def get_queryset(self):
-        qs = super().get_queryset()
-        
-        # OTIMIZAÇÃO: Só roda a verificação se o usuário pedir (para não ficar lento)
-        # Ex: /api/criancas/?atualizar=true
+        # 1. BASE INTELIGENTE:
+        # Já pedimos ao banco para trazer a contagem de vacinas atrasadas de cada criança.
+        # Isso cria um campo virtual 'qtd_atrasos' que usaremos para filtrar.
+        qs = Crianca.objects.annotate(
+            qtd_atrasos=Count('registros', filter=Q(registros__status='ATRASADA'))
+        )
+
+        # 2. LÓGICA DO ROBÔ (Mantida do seu código original)
+        # Se o React pedir ?atualizar=true, verifica atrasos antes de devolver
         if self.request.query_params.get('atualizar') == 'true':
-            # Trazemos vacinas para memória para evitar N+1 queries
             lista_para_checar = qs.prefetch_related('registros__vacina')
             for c in lista_para_checar:
                 c.verificar_atrasos()
-        
+
+        # 3. FILTRO DE STATUS (Vindo do Dropdown do Censo)
+        status_filter = self.request.query_params.get('status_filtro')
+        if status_filter == 'ATRASADO':
+            qs = qs.filter(qtd_atrasos__gt=0) # Traz quem tem > 0 atrasos
+        elif status_filter == 'EM_DIA':
+            qs = qs.filter(qtd_atrasos=0)     # Traz quem tem 0 atrasos
+
+        # 4. ORDENAÇÃO PERSONALIZADA
+        ordem = self.request.query_params.get('ordem')
+        if ordem == 'nome':
+            qs = qs.order_by('nome')
+        elif ordem == 'idade_cresc': # Do mais velho pro mais novo
+            qs = qs.order_by('data_nascimento')
+        elif ordem == 'idade_dec':   # Do mais novo pro mais velho (Padrão bebês)
+            qs = qs.order_by('-data_nascimento')
+        else:
+            qs = qs.order_by('-id') # Padrãozão
+
         return qs
+
+    # --- NOVIDADE: A ROTA DOS CARDS COLORIDOS ---
+    # O React vai chamar: /api/criancas/estatisticas/
+    @action(detail=False, methods=['get'])
+    def estatisticas(self, request):
+        # Pegamos a base completa (sem filtros de página)
+        qs_total = Crianca.objects.all()
+        
+        um_ano_atras = date.today() - timedelta(days=365)
+        
+        # O banco calcula tudo de uma vez (super rápido)
+        dados = qs_total.aggregate(
+            total=Count('id'),
+            meninos=Count('id', filter=Q(sexo='M')),
+            meninas=Count('id', filter=Q(sexo='F')),
+            bebes=Count('id', filter=Q(data_nascimento__gt=um_ano_atras))
+        )
+        
+        return Response(dados)
     
 class RegistroVacinaViewSet(viewsets.ModelViewSet):
     queryset = RegistroVacina.objects.all()

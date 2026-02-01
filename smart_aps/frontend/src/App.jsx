@@ -3,6 +3,7 @@ import Home from './pages/Home'
 import ListaCriancas from './pages/ListaCriancas'
 import Detalhes from './pages/Detalhes'
 import Login from './pages/Login' // <--- Importe aqui
+import Censo from './pages/Censo'
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/lista" element={<ListaCriancas />} />
         <Route path="/crianca/:id" element={<Detalhes />} />
+        <Route path="/censo" element={<Censo />} />
       </Routes>
     </BrowserRouter>
   )
