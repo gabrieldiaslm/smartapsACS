@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv # Importação
 import dj_database_url
+from datetime import timedelta
 
 # 1. Defina o BASE_DIR primeiro
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -35,9 +36,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'core',
-    'pwa',
-
+# --- Bibliotecas de Terceiros (Libs instaladas) ---
+    'rest_framework',   # Para criar a API
+    'django_filters',   # Para os filtros na API
+    'pwa',              # Para o aplicativo mobile/offline
+    'corsheaders',      # <--- ADICIONADO (Para o React conversar com o Django)
+    # --- Seus Apps ---
+    'core',             # O coração do seu sistema
 ]
 
 AUTH_USER_MODEL = 'core.UsuarioACS'
@@ -45,6 +50,7 @@ AUTH_USER_MODEL = 'core.UsuarioACS'
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -138,3 +144,28 @@ PWA_APP_ICONS_APPLE = [
     }
 ]
 PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'core/static/js/serviceworker.js')
+
+# CONFIGURAÇÃO DE CORS (Para o React)
+CORS_ALLOW_ALL_ORIGINS = False
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173", # Porta padrão do Vite/React
+    "http://127.0.0.1:5173",
+]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated', # Bloqueia tudo por padrão (segurança)
+    ),
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),  # O usuario fica logado por 1 dia direto
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7), # Ele pode renovar sem senha por 7 dias
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}

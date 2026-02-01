@@ -1,14 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from django.core.validators import MinValueValidator
 from django.conf import settings
 from datetime import date
 
 # 1. Usuário (ACS)
-# Usaremos o sistema de auth padrão do Django, mas podemos estender se precisar de mais dados do ACS (como número da equipe).
 class UsuarioACS(AbstractUser):
-    # O AbstractUser já possui username, first_name, email e password.
-    # Podemos adicionar campos específicos do ACS se necessário.
     cnes_unidade = models.CharField("CNES da Unidade", max_length=20, blank=True)
 
     class Meta:
@@ -24,7 +20,7 @@ class Crianca(models.Model):
 
     nome = models.CharField(max_length=200)
     data_nascimento = models.DateField()
-    cpf = models.CharField("CPF", max_length=14, unique=True) # Sugestão: usar lib django-localflavor-br depois
+    cpf = models.CharField("CPF", max_length=14, unique=True, null=True, blank=True)
     cns = models.CharField("CNS", max_length=15, unique=True)
     localidade = models.CharField(max_length=100)
     nome_mae = models.CharField("Nome da Mãe", max_length=200)
@@ -36,30 +32,23 @@ class Crianca(models.Model):
 
     class Meta:
         ordering = ['nome']
-        # Cria "atalhos" para o banco de dados encontrar esses dados instantaneamente
         indexes = [
-            models.Index(fields=['nome']),             # Usado na busca
-            models.Index(fields=['data_nascimento']),  # Usado no Censo (cálculo de bebês)
-            models.Index(fields=['sexo']),             # Usado no Censo (meninos/meninas)
-            models.Index(fields=['cns']),              # Usado na busca
+            models.Index(fields=['nome']),
+            models.Index(fields=['data_nascimento']),
+            models.Index(fields=['sexo']),
+            models.Index(fields=['cns']),
         ]
-
 
     @property
     def idade_em_meses(self):
         hoje = date.today()
-        # Cálculo matemático preciso de meses
         meses = (hoje.year - self.data_nascimento.year) * 12 + (hoje.month - self.data_nascimento.month)
         return meses
 
-    # 2. O "Robô" que atualiza os atrasos
     def verificar_atrasos(self):
-        # 1. Calculamos a idade em meses
         hoje = date.today()
         idade_meses = (hoje.year - self.data_nascimento.year) * 12 + (hoje.month - self.data_nascimento.month)
         
-        # 2. Acessamos a lista reversa usando o related_name 'registros_vacina'
-        # Isso traduz para: "Django, pegue todos os registros onde crianca_id sou EU"
         registros_pendentes = self.registros.filter(status='PENDENTE')
         
         for registro in registros_pendentes:
@@ -69,21 +58,13 @@ class Crianca(models.Model):
     
     @property
     def status_geral(self):
-        # Se tiver QUALQUER vacina marcada como atrasada, o status geral é RUIM
         if self.registros.filter(status='ATRASADA').exists():
             return 'ATRASADO'
         return 'EM_DIA'
     
     @property
     def idade_formatada(self):
-        """
-        Retorna uma string amigável:
-        - "2 meses"
-        - "1 ano"
-        - "1 ano e 5 meses"
-        """
         total_meses = self.idade_em_meses
-        
         if total_meses < 12:
             return f"{total_meses} meses"
         
@@ -91,9 +72,7 @@ class Crianca(models.Model):
         meses_restantes = total_meses % 12
         
         if meses_restantes == 0:
-            if anos == 1:
-                return "1 ano"
-            return f"{anos} anos"
+            return "1 ano" if anos == 1 else f"{anos} anos"
         
         msg_anos = "1 ano" if anos == 1 else f"{anos} anos"
         msg_meses = "1 mês" if meses_restantes == 1 else f"{meses_restantes} meses"
@@ -103,15 +82,15 @@ class Crianca(models.Model):
     def __str__(self):
         return f"{self.nome} ({self.data_nascimento})"
 
-# 3. Definição da Vacina (Para o Calendário Vacinal)
+# 3. Definição da Vacina
 class Vacina(models.Model):
-    nome = models.CharField(max_length=100) # Ex: BCG, Pentavalente
+    nome = models.CharField(max_length=100)
     descricao_doenca = models.CharField("Previne que doença", max_length=200)
     idade_alvo_meses = models.IntegerField("Idade Alvo (meses)", help_text="0 para ao nascer")
     dose_padrao = models.CharField("Dose Padrão", max_length=50, default="Dose Única")
     
     class Meta:
-        ordering = ['idade_alvo_meses', 'nome'] # Garante a ordem do calendário
+        ordering = ['idade_alvo_meses', 'nome']
 
     def __str__(self):
         meses = f"{self.idade_alvo_meses} meses" if self.idade_alvo_meses > 0 else "Ao nascer"
@@ -119,84 +98,28 @@ class Vacina(models.Model):
     
     @property
     def idade_formatada(self):
-        """
-        Converte meses em 'Anos' ou 'Anos e Meses'.
-        Ex: 15 meses -> 1 Ano e 3 Meses
-        Ex: 114 meses -> 9 Anos e 6 Meses
-        """
         if self.idade_alvo_meses == 0:
             return "Ao Nascer"
-        
-        # Se for menos de 1 ano (ex: 2, 4, 9 meses), mantém meses
         if self.idade_alvo_meses < 12:
             return f"{self.idade_alvo_meses} Meses"
         
-        # Calcula Anos e Meses restantes
         anos = self.idade_alvo_meses // 12
         meses_restantes = self.idade_alvo_meses % 12
-        
-        # Define singular ou plural para "Ano"
         texto_anos = "Ano" if anos == 1 else "Anos"
         
-        # Lógica de Exibição
         if meses_restantes == 0:
-            # Ex: 12, 24, 48 -> "1 Ano", "2 Anos"
             return f"{anos} {texto_anos}"
         else:
-            # Ex: 15, 114 -> "1 Ano e 3 Meses", "9 Anos e 6 Meses"
             return f"{anos} {texto_anos} e {meses_restantes} Meses"
 
 # 4. Cartão de Vacina (O Registro da Aplicação)
 class RegistroVacina(models.Model):
-    lote = models.CharField(max_length=50, blank=True, null=True) 
-    observacao = models.TextField(blank=True, null=True)
-    
-
     STATUS_CHOICES = [
         ('PENDENTE', 'Em Aberto'),
-        ('ATRASADA', 'Atrasada'), # Isso pode ser calculado dinamicamente também
+        ('ATRASADA', 'Atrasada'),
         ('APLICADA', 'Aplicada'),
     ]
     
-    VIA_CHOICES = [
-        ('INTRAMUSCULAR', 'Intramuscular'),
-        ('SUBCUTANEA', 'Subcutânea'),
-        ('ORAL', 'Oral'),
-        ('INTRADERMICA', 'Intradérmica'),
-    ]
-
-    crianca = models.ForeignKey(Crianca, on_delete=models.CASCADE, related_name='registros') 
-    
-    vacina = models.ForeignKey(Vacina, on_delete=models.CASCADE)
-    
-    # Detalhes da aplicação
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')
-    dose = models.CharField(max_length=50) # Ex: 1ª Dose, Reforço
-    lote = models.CharField(max_length=50, blank=True)
-    fabricante = models.CharField(max_length=100, blank=True)
-    observacoes = models.TextField(blank=True, null=True)
-    profissional_aplicou = models.CharField(max_length=100, blank=True)
-    data_aplicacao = models.DateField(blank=True, null=True)
-    
-    via_administracao = models.CharField(max_length=30, choices=VIA_CHOICES, blank=True)
-    local_aplicacao = models.CharField(max_length=100, blank=True) # Ex: Deltoide direito
-    estrategia = models.CharField(max_length=100, default="Rotina") # Rotina ou Campanha
-
-    class Meta:
-        indexes = [
-            models.Index(fields=['status']), # Muito usado para contar atrasos
-        ]
-    
-    # NOVO CAMPO:
-    aplicado_por = models.ForeignKey(
-        settings.AUTH_USER_MODEL, # Aponta para o seu UsuarioACS
-        on_delete=models.SET_NULL, # Se o usuário for demitido/deletado, o registro fica mas sem nome
-        null=True, 
-        blank=True,
-        related_name='vacinas_aplicadas'
-    )
-
-    # --- OPÇÕES DOS DROPDOWNS ---
     ESTRATEGIAS = [
         ('ROTINA', 'Rotina'),
         ('CAMPANHA', 'Campanha'),
@@ -212,40 +135,66 @@ class RegistroVacina(models.Model):
     ]
 
     LOCAIS = [
-        ('VASTO_LATERAL_D', 'Vasto Lateral Direito (Coxa)'),
-        ('VASTO_LATERAL_E', 'Vasto Lateral Esquerdo (Coxa)'),
         ('DELTOIDE_D', 'Deltoide Direito (Braço)'),
         ('DELTOIDE_E', 'Deltoide Esquerdo (Braço)'),
-        ('GLUTEO_D', 'Glúteo Direito'),
-        ('GLUTEO_E', 'Glúteo Esquerdo'),
+        ('VASTO_LATERAL_D', 'Vasto Lateral da Coxa D'),
+        ('VASTO_LATERAL_E', 'Vasto Lateral da Coxa E'),
+        ('GLUTEO_D', 'Glúteo (Dorso-Glúteo)'),
         ('BOCA', 'Boca (Oral)'),
         ('OUTROS', 'Outros'),
     ]
 
-    # --- CAMPOS ---
-    # O parametro 'choices' é o que transforma o campo em Dropdown no Admin e no Form padrão
-    status = models.CharField(max_length=20, default='PENDENTE') # Vamos tratar isso no form
-    estrategia = models.CharField(max_length=20, choices=ESTRATEGIAS, default='ROTINA')
-    via_administracao = models.CharField(max_length=20, choices=VIAS, default='INTRAMUSCULAR')
-    local_aplicacao = models.CharField(max_length=20, choices=LOCAIS, blank=True, null=True)
+    # --- CAMPOS (Atualize os defaults para MAIÚSCULO) ---
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')
     
-    # Campos de texto livre (não são dropdown)
+    estrategia = models.CharField(max_length=50, choices=ESTRATEGIAS, default='ROTINA')
+    
+    via_administracao = models.CharField(max_length=50, choices=VIAS, default='INTRAMUSCULAR')
+    
+    local_aplicacao = models.CharField(max_length=50, choices=LOCAIS, blank=True, null=True)
+
+    # --- RELACIONAMENTOS ---
+    crianca = models.ForeignKey(Crianca, on_delete=models.CASCADE, related_name='registros') 
+    vacina = models.ForeignKey(Vacina, on_delete=models.CASCADE)
+    aplicado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, 
+        blank=True,
+        related_name='vacinas_aplicadas'
+    )
+
+    # --- CAMPOS DE DADOS ---
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')
+    dose = models.CharField(max_length=50, blank=True, null=True) # Ex: 1ª Dose
+    data_aplicacao = models.DateField(blank=True, null=True)
+    
+    # Detalhes Clínicos
+    estrategia = models.CharField(max_length=50, choices=ESTRATEGIAS, default='Rotina')
+    via_administracao = models.CharField(max_length=50, choices=VIAS, default='Intramuscular')
+    local_aplicacao = models.CharField(max_length=50, choices=LOCAIS, blank=True, null=True)
+    
+    # Rastreabilidade
     lote = models.CharField(max_length=50, blank=True, null=True)
-    fabricante = models.CharField(max_length=50, blank=True, null=True)
+    fabricante = models.CharField(max_length=100, blank=True, null=True)
     observacoes = models.TextField(blank=True, null=True)
-    
-    # Profissional (Será dropdown dinâmico no form)
-    profissional_aplicou = models.CharField(max_length=100, blank=True, null=True)
+    profissional_aplicou = models.CharField(max_length=100, blank=True, null=True) # Texto livre caso não seja o usuário logado
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['status']),
+        ]
 
     def __str__(self):
         return f"{self.vacina.nome} - {self.crianca.nome}"
-    
+
+# 5. Lote de Vacina (Estoque/Disponível)
 class LoteVacina(models.Model):
     vacina = models.ForeignKey(Vacina, on_delete=models.CASCADE, related_name='lotes')
     numero_lote = models.CharField(max_length=50)
     fabricante = models.CharField(max_length=100)
-    quantidade_disponivel = models.IntegerField(default=0) # Opcional, mas útil
-    validade = models.DateField(blank=True, null=True)     # Opcional
+    quantidade_disponivel = models.IntegerField(default=0)
+    validade = models.DateField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.vacina.nome} - Lote: {self.numero_lote} ({self.fabricante})"

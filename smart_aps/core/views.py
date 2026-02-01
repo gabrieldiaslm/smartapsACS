@@ -8,11 +8,19 @@ from django.contrib import messages
 from django.views.decorators.cache import never_cache
 from django.http import JsonResponse
 from django.core.paginator import Paginator
+# Adicione estes imports do DRF no topo do arquivo
+from rest_framework import viewsets, filters
+from django_filters.rest_framework import DjangoFilterBackend
+from .serializers import CriancaSerializer, RegistroVacinaSerializer
 
 
 def api_lotes_por_vacina(request, vacina_id):
-    # Busca todos os lotes daquela vacina
-    lotes = LoteVacina.objects.filter(vacina_id=vacina_id).values('numero_lote', 'fabricante')
+    # ADICIONADO: 'quantidade_disponivel' é obrigatório para o React exibir a lista
+    lotes = LoteVacina.objects.filter(vacina_id=vacina_id).values(
+        'numero_lote', 
+        'fabricante', 
+        'quantidade_disponivel' 
+    )
     return JsonResponse(list(lotes), safe=False)
 
 
@@ -319,3 +327,90 @@ def lista_usuarios(request):
 
 def offline_view(request):
     return render(request, 'offline.html')
+
+# =========================================================
+#  ÁREA DA API (Django REST Framework)
+# =========================================================
+
+class CriancaViewSet(viewsets.ModelViewSet):
+    """
+    API completa para gerenciar Crianças.
+    O React vai bater aqui para pegar JSON.
+    """
+    # 1. Qual é a fonte de dados?
+    queryset = Crianca.objects.all().order_by('-id')
+    
+    # 2. Qual é o tradutor?
+    serializer_class = CriancaSerializer
+    
+    # 3. Filtros e Busca (Igual ao seu Censo, mas automático)
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    
+    # Habilita busca por texto (?search=Joao)
+    search_fields = ['nome', 'cns', 'nome_mae']
+    
+    # Habilita filtros exatos (?sexo=M)
+    filterset_fields = ['sexo', 'localidade']
+
+    # Opcional: Replicar o "Robô de Atrasos" na API
+    # Toda vez que a API listar crianças, ela verifica atrasos antes
+    def get_queryset(self):
+        qs = super().get_queryset()
+        
+        # OTIMIZAÇÃO: Só roda a verificação se o usuário pedir (para não ficar lento)
+        # Ex: /api/criancas/?atualizar=true
+        if self.request.query_params.get('atualizar') == 'true':
+            # Trazemos vacinas para memória para evitar N+1 queries
+            lista_para_checar = qs.prefetch_related('registros__vacina')
+            for c in lista_para_checar:
+                c.verificar_atrasos()
+        
+        return qs
+    
+class RegistroVacinaViewSet(viewsets.ModelViewSet):
+    queryset = RegistroVacina.objects.all()
+    serializer_class = RegistroVacinaSerializer
+    http_method_names = ['get', 'patch', 'put', 'head', 'options']
+
+    def perform_update(self, serializer):
+        # 1. Pega o estado ANTES de salvar (Do Banco)
+        registro_antigo = self.get_object()
+        estava_aplicada = registro_antigo.status == 'APLICADA'
+        
+        print(f"DEBUG: Status Antigo: {registro_antigo.status}")
+
+        # 2. Salva as mudanças
+        registro_novo = serializer.save()
+        
+        print(f"DEBUG: Status Novo: {registro_novo.status}")
+        print(f"DEBUG: Lote Informado: '{registro_novo.lote}'")
+
+        # 3. Lógica de Baixa de Estoque
+        # Só entra se:
+        # - Virou APLICADA agora (não era antes)
+        # - Tem um lote preenchido
+        if registro_novo.status == 'APLICADA' and not estava_aplicada and registro_novo.lote:
+            print("DEBUG: Entrou na lógica de baixa de estoque...")
+            
+            # Tenta achar o lote (ignorando maiúsculas/minúsculas para garantir)
+            lote_obj = LoteVacina.objects.filter(
+                vacina=registro_novo.vacina, 
+                numero_lote__iexact=registro_novo.lote # iexact ignora caixa alta/baixa
+            ).first()
+            
+            if lote_obj:
+                print(f"DEBUG: Lote encontrado! Qtd Atual: {lote_obj.quantidade_disponivel}")
+                
+                if lote_obj.quantidade_disponivel > 0:
+                    lote_obj.quantidade_disponivel = F('quantidade_disponivel') - 1
+                    lote_obj.save()
+                    
+                    # Recarrega para confirmar
+                    lote_obj.refresh_from_db()
+                    print(f"SUCESSO: Estoque baixado para {lote_obj.quantidade_disponivel}")
+                else:
+                    print("AVISO: Estoque já estava zerado.")
+            else:
+                print(f"ERRO: Lote '{registro_novo.lote}' não encontrado no banco para a vacina {registro_novo.vacina}.")
+        else:
+            print("DEBUG: Não baixou estoque. Motivo: Ou já estava aplicada, ou não tem lote, ou status não é APLICADA.")
