@@ -38,7 +38,7 @@ def api_lotes_por_vacina(request, vacina_id):
 def is_admin(user):
     return user.is_superuser
 
-@user_passes_test(is_admin) # Só deixa passar se eh_admin for True
+@user_passes_test(is_admin)
 def cadastrar_acs(request):
     """Card 5: Admin cria novo ACS"""
     if request.method == 'POST':
@@ -456,6 +456,7 @@ class RegistroVacinaViewSet(viewsets.ModelViewSet):
         else:
             print("DEBUG: Não baixou estoque. Motivo: Ou já estava aplicada, ou não tem lote, ou status não é APLICADA.")
 
+# Nav bar do React
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def usuario_atual(request):
