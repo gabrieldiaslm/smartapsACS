@@ -8,7 +8,6 @@ from django.contrib import messages
 from django.views.decorators.cache import never_cache
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-# Adicione estes imports do DRF no topo do arquivo
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
 from .serializers import CriancaSerializer, RegistroVacinaSerializer, VacinaSerializer
