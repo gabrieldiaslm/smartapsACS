@@ -41,5 +41,6 @@ urlpatterns = [
     # NOVA ROTA: React vai chamar aqui para pegar os lotes da vacina X
     path('api/vacinas/<int:vacina_id>/lotes/', views.api_lotes_por_vacina, name='api_lotes_por_vacina'),
     path('api/', include(router.urls)),
+    path('api/usuario/me/', views.usuario_atual, name='usuario_atual'),
 
 ]

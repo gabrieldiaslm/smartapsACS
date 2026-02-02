@@ -12,8 +12,9 @@ from django.core.paginator import Paginator
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
 from .serializers import CriancaSerializer, RegistroVacinaSerializer
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 
 def api_lotes_por_vacina(request, vacina_id):
     # ADICIONADO: 'quantidade_disponivel' é obrigatório para o React exibir a lista
@@ -445,3 +446,14 @@ class RegistroVacinaViewSet(viewsets.ModelViewSet):
                 print(f"ERRO: Lote '{registro_novo.lote}' não encontrado no banco para a vacina {registro_novo.vacina}.")
         else:
             print("DEBUG: Não baixou estoque. Motivo: Ou já estava aplicada, ou não tem lote, ou status não é APLICADA.")
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def usuario_atual(request):
+    """Retorna os dados do usuário logado"""
+    user = request.user
+    return Response({
+        'id': user.id,
+        'username': user.username,
+        'full_name': user.get_full_name() or user.username # Se não tiver nome completo, usa o login
+    })

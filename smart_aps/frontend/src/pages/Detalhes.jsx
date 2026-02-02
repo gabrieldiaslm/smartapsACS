@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../api'
 import Layout from '../components/Layout'
-import ModalVacina from '../components/ModalVacina' // <--- IMPORTANTE
+import ModalVacina from '../components/ModalVacina'
 
 function Detalhes() {
   const { id } = useParams()
@@ -12,7 +12,6 @@ function Detalhes() {
   // Estado para controlar qual vacina foi clicada
   const [vacinaSelecionada, setVacinaSelecionada] = useState(null)
 
-  // Função isolada para poder ser chamada no início E depois de salvar
   const carregarDados = () => {
     api.get(`criancas/${id}/`)
       .then(response => {
@@ -25,7 +24,6 @@ function Detalhes() {
       })
   }
 
-  // Carrega na montagem do componente
   useEffect(() => {
     carregarDados()
   }, [id])
@@ -41,13 +39,29 @@ function Detalhes() {
     }, {})
   }
 
-  const getNomeIdade = (meses) => {
+  // --- NOVA FUNÇÃO DE FORMATAÇÃO DE IDADE ---
+  const getNomeIdade = (valor) => {
+    const meses = parseInt(valor)
+    
     if (meses === 0) return "Ao Nascer"
     if (meses === 1) return "1 Mês"
-    return `${meses} Meses`
+    if (meses < 12) return `${meses} Meses`
+
+    // Cálculo de Anos
+    const anos = Math.floor(meses / 12)
+    const resto = meses % 12
+
+    let texto = anos === 1 ? "1 Ano" : `${anos} Anos`
+
+    // Adiciona os meses restantes se houver (ex: 1 Ano e 2 Meses)
+    if (resto > 0) {
+      texto += ` e ${resto} ${resto === 1 ? "Mês" : "Meses"}`
+    }
+    
+    return texto
   }
 
-  if (loading) return <Layout><div className="text-center mt-5">Carregando...</div></Layout>
+  if (loading) return <Layout><div className="text-center mt-5"><div className="spinner-border text-primary"></div></div></Layout>
   if (!crianca) return <Layout><div className="alert alert-danger m-3">Criança não encontrada.</div></Layout>
 
   const gruposVacinas = agruparPorIdade(crianca.registros)
@@ -59,24 +73,28 @@ function Detalhes() {
         
         {/* --- TOPO DA PÁGINA --- */}
         <div className="d-flex justify-content-between align-items-start mb-4">
-            <Link to="/lista" className="btn btn-outline-warning text-dark fw-bold px-4" style={{borderRadius: '20px'}}>
+            <Link to="/lista" className="btn btn-outline-secondary rounded-pill px-4 fw-bold">
                 <i className="fa-solid fa-arrow-left me-2"></i> Voltar
             </Link>
 
             <div className="text-end">
                 <h2 className="fw-bold text-primary mb-0" style={{color: '#2c3e50'}}>{crianca.nome}</h2>
-                <span className="badge bg-secondary">{crianca.idade_formatada}</span>
+                <div className="text-muted">
+                    <i className="fa-solid fa-cake-candles me-2"></i> {crianca.idade_formatada}
+                </div>
             </div>
         </div>
 
         {/* --- LOOP DOS GRUPOS DE IDADE --- */}
         {idadesOrdenadas.map((idade) => (
-            <div key={idade} className="mb-5">
+            <div key={idade} className="mb-4">
                 
-                {/* Cabeçalho do Grupo */}
+                {/* Cabeçalho do Grupo (Agora usa a nova formatação) */}
                 <div className="d-flex align-items-center mb-3 p-2 bg-white rounded shadow-sm border-start border-5 border-warning">
-                    <i className="fa-regular fa-clock me-2 text-secondary"></i>
-                    <h5 className="fw-bold m-0 text-dark">{getNomeIdade(parseInt(idade))}</h5>
+                    <i className="fa-regular fa-clock me-2 text-secondary ms-2"></i>
+                    <h5 className="fw-bold m-0 text-dark">
+                        {getNomeIdade(idade)}
+                    </h5>
                 </div>
 
                 {/* Grid de Cards de Vacina */}
@@ -84,45 +102,49 @@ function Detalhes() {
                     {gruposVacinas[idade].map((reg) => (
                         <div key={reg.id} className="col-12 col-md-6 col-lg-4">
                             
-                            {/* O CARD AGORA É CLICÁVEL */}
                             <div 
-                                onClick={() => setVacinaSelecionada(reg)} // <--- CLIQUE AQUI ABRE O MODAL
-                                className={`card h-100 shadow-sm ${reg.status === 'ATRASADA' ? 'border-danger bg-light-danger' : 'border-light'}`}
+                                onClick={() => setVacinaSelecionada(reg)} 
+                                className={`card h-100 shadow-sm border-0`}
                                 style={{
-                                    cursor: 'pointer', // Mãozinha
-                                    backgroundColor: reg.status === 'ATRASADA' ? '#fff5f5' : '',
-                                    transition: 'transform 0.2s'
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.2s',
+                                    // Borda colorida na esquerda baseada no status
+                                    borderLeft: reg.status === 'APLICADA' ? '5px solid #198754' : 
+                                                reg.status === 'ATRASADA' ? '5px solid #dc3545' : 
+                                                '5px solid #6c757d'
                                 }}
-                                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-3px)'
+                                    e.currentTarget.className = e.currentTarget.className.replace('shadow-sm', 'shadow')
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0)'
+                                    e.currentTarget.className = e.currentTarget.className.replace('shadow', 'shadow-sm')
+                                }}
                             >
                                 <div className="card-body">
-                                    <h6 className="fw-bold text-primary mb-2">{reg.nome_vacina}</h6>
-                                    <span className="badge bg-light text-dark border mb-3">
+                                    <div className="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 className="fw-bold text-dark mb-0">{reg.nome_vacina}</h6>
+                                        {/* Status Icon no canto */}
+                                        {reg.status === 'APLICADA' && <i className="fa-solid fa-circle-check text-success fs-5"></i>}
+                                        {reg.status === 'ATRASADA' && <i className="fa-solid fa-triangle-exclamation text-danger fs-5"></i>}
+                                    </div>
+                                    
+                                    <span className="badge bg-light text-secondary border mb-3">
                                         {reg.dose || "Dose Única"}
                                     </span>
 
-                                    <div className="d-flex align-items-center">
+                                    <div className="d-flex align-items-center small">
                                         {reg.status === 'ATRASADA' && (
-                                            <>
-                                                <i className="fa-solid fa-triangle-exclamation text-danger me-2"></i>
-                                                <span className="fw-bold text-danger">Atrasada</span>
-                                            </>
+                                            <span className="fw-bold text-danger">Atrasada</span>
                                         )}
                                         {reg.status === 'PENDENTE' && (
-                                            <>
-                                                <i className="fa-regular fa-circle text-secondary me-2"></i>
-                                                <span className="text-secondary">Pendente</span>
-                                            </>
+                                            <span className="text-secondary">Pendente</span>
                                         )}
                                         {reg.status === 'APLICADA' && (
-                                            <>
-                                                <i className="fa-solid fa-check-circle text-success me-2"></i>
-                                                <span className="fw-bold text-success">
-                                                    {/* TRUQUE: Divide a string "2026-02-01" e remonta como "01/02/2026" */}
-                                                    Aplicada em {reg.data_aplicacao.split('-').reverse().join('/')}
-                                                </span>
-                                            </>
+                                            <span className="fw-bold text-success">
+                                                Aplicada em {reg.data_aplicacao ? reg.data_aplicacao.split('-').reverse().join('/') : ''}
+                                            </span>
                                         )}
                                     </div>
                                 </div>
@@ -141,11 +163,10 @@ function Detalhes() {
         {/* --- MODAL DE EDIÇÃO --- */}
         {vacinaSelecionada && (
             <ModalVacina 
-                // A KEY É O SEGREDO: Se mudar o ID, o React reinicia o Modal do zero
                 key={vacinaSelecionada.id} 
                 registro={vacinaSelecionada}
                 onClose={() => setVacinaSelecionada(null)}
-                onSave={carregarDados} // Recarrega a tela ao salvar
+                onSave={carregarDados}
             />
         )}
 
