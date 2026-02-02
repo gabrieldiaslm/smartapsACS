@@ -13,6 +13,7 @@ from core.views import CriancaViewSet, RegistroVacinaViewSet
 router = DefaultRouter()
 router.register(r'criancas', CriancaViewSet, basename='crianca')
 router.register(r'registros', RegistroVacinaViewSet, basename='registro')
+router.register(r'vacinas-guia', views.VacinaViewSet, basename='vacinas-guia')
 
 urlpatterns = [
     # Rota administrativa
@@ -42,5 +43,6 @@ urlpatterns = [
     path('api/vacinas/<int:vacina_id>/lotes/', views.api_lotes_por_vacina, name='api_lotes_por_vacina'),
     path('api/', include(router.urls)),
     path('api/usuario/me/', views.usuario_atual, name='usuario_atual'),
+    
 
 ]

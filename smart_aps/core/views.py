@@ -11,10 +11,19 @@ from django.core.paginator import Paginator
 # Adicione estes imports do DRF no topo do arquivo
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
-from .serializers import CriancaSerializer, RegistroVacinaSerializer
+from .serializers import CriancaSerializer, RegistroVacinaSerializer, VacinaSerializer
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+
+
+class VacinaViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Lista todas as vacinas ordenadas por idade para o Guia Vacinal
+    """
+    queryset = Vacina.objects.all().order_by('idade_alvo_meses', 'nome')
+    serializer_class = VacinaSerializer
+    pagination_class = None
 
 def api_lotes_por_vacina(request, vacina_id):
     # ADICIONADO: 'quantidade_disponivel' é obrigatório para o React exibir a lista

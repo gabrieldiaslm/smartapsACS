@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Crianca, RegistroVacina
+from .models import Crianca, RegistroVacina, Vacina
 
 class RegistroVacinaSerializer(serializers.ModelSerializer):
     nome_vacina = serializers.CharField(source='vacina.nome', read_only=True)
@@ -40,3 +40,8 @@ class CriancaSerializer(serializers.ModelSerializer):
             'localidade', 'nome_mae', 'idade_formatada', 
             'status_geral', 'registros'
         ]
+
+class VacinaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Vacina
+        fields = ['id', 'nome', 'descricao_doenca', 'idade_alvo_meses', 'dose_padrao']
