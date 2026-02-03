@@ -354,40 +354,52 @@ class CriancaViewSet(viewsets.ModelViewSet):
     filterset_fields = ['sexo', 'localidade']
 
     def get_queryset(self):
-        # 1. BASE INTELIGENTE:
-        # Já pedimos ao banco para trazer a contagem de vacinas atrasadas de cada criança.
-        # Isso cria um campo virtual 'qtd_atrasos' que usaremos para filtrar.
-        qs = Crianca.objects.annotate(
+        # --- PASSO 0: FILTRO DE IDADE (REGRA DOS 10 ANOS) ---
+        # Calculamos a data exata de 10 anos atrás.
+        hoje = date.today()
+        try:
+            # Tenta subtrair 10 anos direto
+            data_corte = hoje.replace(year=hoje.year - 10)
+        except ValueError:
+            # Se for 29 de fev e 10 anos atrás não for bissexto, ajusta para dia 28
+            data_corte = hoje.replace(year=hoje.year - 10, day=28)
+
+        # Começamos filtrando: data de nascimento tem que ser MAIOR (gt) que a data de corte.
+        # Ex: Se corte é 2016, quem nasceu em 2017 (Data Maior) entra. Quem nasceu em 2015 sai.
+        qs = Crianca.objects.filter(data_nascimento__gt=data_corte)
+
+        # 1. BASE INTELIGENTE (Agora aplicada apenas aos < 10 anos):
+        # Traz a contagem de vacinas atrasadas
+        qs = qs.annotate(
             qtd_atrasos=Count('registros', filter=Q(registros__status='ATRASADA'))
         )
 
-        # 2. LÓGICA DO ROBÔ (Mantida do seu código original)
-        # Se o React pedir ?atualizar=true, verifica atrasos antes de devolver
+        # 2. LÓGICA DO ROBÔ
         if self.request.query_params.get('atualizar') == 'true':
             lista_para_checar = qs.prefetch_related('registros__vacina')
             for c in lista_para_checar:
                 c.verificar_atrasos()
 
-        # 3. FILTRO DE STATUS (Vindo do Dropdown do Censo)
+        # 3. FILTRO DE STATUS
         status_filter = self.request.query_params.get('status_filtro')
         if status_filter == 'ATRASADO':
-            qs = qs.filter(qtd_atrasos__gt=0) # Traz quem tem > 0 atrasos
+            qs = qs.filter(qtd_atrasos__gt=0)
         elif status_filter == 'EM_DIA':
-            qs = qs.filter(qtd_atrasos=0)     # Traz quem tem 0 atrasos
+            qs = qs.filter(qtd_atrasos=0)
 
-        # 4. ORDENAÇÃO PERSONALIZADA
+        # 4. ORDENAÇÃO
         ordem = self.request.query_params.get('ordem')
         if ordem == 'nome':
             qs = qs.order_by('nome')
-        elif ordem == 'idade_cresc': # Do mais velho pro mais novo
+        elif ordem == 'idade_cresc':
             qs = qs.order_by('data_nascimento')
-        elif ordem == 'idade_dec':   # Do mais novo pro mais velho (Padrão bebês)
+        elif ordem == 'idade_dec':
             qs = qs.order_by('-data_nascimento')
         else:
-            qs = qs.order_by('-id') # Padrãozão
+            qs = qs.order_by('-id')
 
         return qs
-
+    
     # --- NOVIDADE: A ROTA DOS CARDS COLORIDOS ---
     # O React vai chamar: /api/criancas/estatisticas/
     @action(detail=False, methods=['get'])

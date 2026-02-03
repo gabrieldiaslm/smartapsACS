@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from django.db.models.signals import post_save # <--- Import necessário para automação
+from django.dispatch import receiver           # <--- Import necessário para automação
 from datetime import date
 
 # 1. Usuário (ACS)
@@ -42,19 +44,26 @@ class Crianca(models.Model):
     @property
     def idade_em_meses(self):
         hoje = date.today()
-        meses = (hoje.year - self.data_nascimento.year) * 12 + (hoje.month - self.data_nascimento.month)
-        return meses
+        try:
+            meses = (hoje.year - self.data_nascimento.year) * 12 + (hoje.month - self.data_nascimento.month)
+            return meses
+        except:
+            return 0
 
     def verificar_atrasos(self):
         hoje = date.today()
-        idade_meses = (hoje.year - self.data_nascimento.year) * 12 + (hoje.month - self.data_nascimento.month)
+        idade_meses = self.idade_em_meses
         
-        registros_pendentes = self.registros.filter(status='PENDENTE')
+        # Pega pendentes onde a idade da criança já passou da idade da vacina
+        # Ex: Criança tem 4 meses, Vacina é de 2 meses e está PENDENTE -> Vira ATRASADA
+        registros_para_atualizar = self.registros.filter(
+            status='PENDENTE', 
+            vacina__idade_alvo_meses__lt=idade_meses
+        )
         
-        for registro in registros_pendentes:
-            if idade_meses > registro.vacina.idade_alvo_meses:
-                registro.status = 'ATRASADA'
-                registro.save()
+        for registro in registros_para_atualizar:
+            registro.status = 'ATRASADA'
+            registro.save()
     
     @property
     def status_geral(self):
@@ -144,15 +153,6 @@ class RegistroVacina(models.Model):
         ('OUTROS', 'Outros'),
     ]
 
-    # --- CAMPOS (Atualize os defaults para MAIÚSCULO) ---
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')
-    
-    estrategia = models.CharField(max_length=50, choices=ESTRATEGIAS, default='ROTINA')
-    
-    via_administracao = models.CharField(max_length=50, choices=VIAS, default='INTRAMUSCULAR')
-    
-    local_aplicacao = models.CharField(max_length=50, choices=LOCAIS, blank=True, null=True)
-
     # --- RELACIONAMENTOS ---
     crianca = models.ForeignKey(Crianca, on_delete=models.CASCADE, related_name='registros') 
     vacina = models.ForeignKey(Vacina, on_delete=models.CASCADE)
@@ -164,29 +164,36 @@ class RegistroVacina(models.Model):
         related_name='vacinas_aplicadas'
     )
 
-    # --- CAMPOS DE DADOS ---
+    # --- DADOS DO REGISTRO ---
+    # Importante: Mantivemos defaults em MAIÚSCULO para bater com as CHOICES
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')
     dose = models.CharField(max_length=50, blank=True, null=True) # Ex: 1ª Dose
+    
+    # Campo auxiliar para ordenação rápida sem precisar de join com tabela Vacina
+    idade_alvo = models.IntegerField(default=0) 
+    
     data_aplicacao = models.DateField(blank=True, null=True)
     
     # Detalhes Clínicos
-    estrategia = models.CharField(max_length=50, choices=ESTRATEGIAS, default='Rotina')
-    via_administracao = models.CharField(max_length=50, choices=VIAS, default='Intramuscular')
+    estrategia = models.CharField(max_length=50, choices=ESTRATEGIAS, default='ROTINA')
+    via_administracao = models.CharField(max_length=50, choices=VIAS, default='INTRAMUSCULAR')
     local_aplicacao = models.CharField(max_length=50, choices=LOCAIS, blank=True, null=True)
     
     # Rastreabilidade
     lote = models.CharField(max_length=50, blank=True, null=True)
     fabricante = models.CharField(max_length=100, blank=True, null=True)
     observacoes = models.TextField(blank=True, null=True)
-    profissional_aplicou = models.CharField(max_length=100, blank=True, null=True) # Texto livre caso não seja o usuário logado
+    profissional_aplicou = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
+        ordering = ['idade_alvo', 'vacina__nome'] # Ordena pela idade da vacina
         indexes = [
             models.Index(fields=['status']),
+            models.Index(fields=['crianca']),
         ]
 
     def __str__(self):
-        return f"{self.vacina.nome} - {self.crianca.nome}"
+        return f"{self.vacina.nome} - {self.crianca.nome} ({self.status})"
 
 # 5. Lote de Vacina (Estoque/Disponível)
 class LoteVacina(models.Model):
@@ -202,3 +209,26 @@ class LoteVacina(models.Model):
     class Meta:
         verbose_name = "Lote Disponível"
         verbose_name_plural = "Lotes Disponíveis"
+
+
+# --- SINAL AUTOMÁTICO PARA CRIAR CARTÃO ---
+# Isso garante que a criança sempre nasça com o cartão de vacina, 
+# mesmo se criada pelo Admin do Django.
+
+@receiver(post_save, sender=Crianca)
+def criar_cartao_vacina_automatico(sender, instance, created, **kwargs):
+    if created:
+        vacinas_disponiveis = Vacina.objects.all()
+        registros = []
+        
+        for vacina in vacinas_disponiveis:
+            registros.append(RegistroVacina(
+                crianca=instance,
+                vacina=vacina,
+                dose=vacina.dose_padrao,
+                idade_alvo=vacina.idade_alvo_meses, # Preenche o campo auxiliar
+                status='PENDENTE'
+            ))
+        
+        # Cria tudo de uma vez no banco
+        RegistroVacina.objects.bulk_create(registros)
