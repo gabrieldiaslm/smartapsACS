@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from .models import Crianca, Vacina, RegistroVacina, UsuarioACS, LoteVacina
 from .forms import CriancaForm, RegistroVacinaForm, UsuarioACSForm
 from datetime import date, timedelta
-from django.db.models import Count, Q, F
+from django.db.models import Count, Q, F, Case, When, Value, BooleanField
 from django.contrib import messages
 from django.views.decorators.cache import never_cache
 from django.http import JsonResponse
@@ -87,14 +87,130 @@ def index(request):
 @never_cache
 @login_required
 def lista_criancas(request):
-    """Antiga tela inicial: Lista e Busca"""
+    # 1. FILTRO DE IDADE (10 ANOS)
+    hoje = date.today()
+    try:
+        data_corte = hoje.replace(year=hoje.year - 10)
+    except ValueError:
+        data_corte = hoje.replace(year=hoje.year - 10, day=28)
+    
+    # Base QuerySet
+    qs = Crianca.objects.filter(data_nascimento__gt=data_corte)
+
+    # 2. OTIMIZAÇÃO (A Mágica do SQL) ⚡
+    # Cria a coluna virtual 'is_atrasado' direto no banco
+    qs = qs.annotate(
+        qtd_atrasos=Count('registros', filter=Q(registros__status='ATRASADA'))
+    ).annotate(
+        is_atrasado=Case(
+            When(qtd_atrasos__gt=0, then=Value(True)),
+            default=Value(False),
+            output_field=BooleanField()
+        )
+    )
+
+    # 3. BUSCA
     query = request.GET.get('busca')
     if query:
-        criancas = Crianca.objects.filter(nome__icontains=query)
-    else:
-        criancas = Crianca.objects.all().order_by('-criado_em')[:20]
+        qs = qs.filter(nome__icontains=query)
+
+    # 4. ORDENAÇÃO
+    # Dica: Podemos ordenar para mostrar os Atrasados primeiro se quiser!
+    # Mas vamos manter o padrão (Mais recentes primeiro)
+    qs = qs.order_by('-criado_em')
+
+    # 5. PAGINAÇÃO
+    paginator = Paginator(qs, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
     
-    return render(request, 'lista_criancas.html', {'criancas': criancas})
+    return render(request, 'lista_criancas.html', {'criancas': page_obj})
+
+
+def censo_demografico(request):
+    # --- 1. FILTRO BASE (10 ANOS) ---
+    hoje = date.today()
+    try:
+        data_corte = hoje.replace(year=hoje.year - 10)
+    except ValueError:
+        data_corte = hoje.replace(year=hoje.year - 10, day=28)
+    
+    # QuerySet Base (Ainda não foi no banco)
+    qs = Crianca.objects.filter(data_nascimento__gt=data_corte)
+
+    # --- 2. OTIMIZAÇÃO DE STATUS (O PULO DO GATO 😺) ---
+    # Em vez de calcular no Python, pedimos pro banco já trazer uma coluna "tem_atraso"
+    # Isso elimina o N+1 Queries do template
+    qs = qs.annotate(
+        qtd_pendencias_vencidas=Count(
+            'registros', 
+            filter=Q(registros__status='ATRASADA')
+        )
+    ).annotate(
+        is_atrasado=Case(
+            When(qtd_pendencias_vencidas__gt=0, then=Value(True)),
+            default=Value(False),
+            output_field=BooleanField()
+        )
+    )
+
+    # --- 3. APLICAÇÃO DOS FILTROS DA TELA ---
+    busca = request.GET.get('busca')
+    status_filtro = request.GET.get('status')
+    sexo_filtro = request.GET.get('sexo')
+    ordem_filtro = request.GET.get('ordem')
+
+    if busca:
+        qs = qs.filter(nome__icontains=busca)
+    
+    if sexo_filtro:
+        qs = qs.filter(sexo=sexo_filtro)
+
+    # Agora filtramos usando a anotação SQL, muito mais rápido
+    if status_filtro == 'ATRASADO':
+        qs = qs.filter(is_atrasado=True)
+    elif status_filtro == 'EM_DIA':
+        qs = qs.filter(is_atrasado=False)
+
+    # Ordenação
+    if ordem_filtro == 'nome':
+        qs = qs.order_by('nome')
+    elif ordem_filtro == 'idade_cresc':
+        qs = qs.order_by('data_nascimento') 
+    else: 
+        qs = qs.order_by('-data_nascimento')
+
+    # --- 4. ESTATÍSTICAS (1 CONSULTA SÓ) ---
+    # Usamos 'aggregate' para pegar todos os números dos cards de uma vez
+    um_ano_atras = hoje - timedelta(days=365)
+    
+    # IMPORTANTE: Calculamos as stats baseadas no QuerySet filtrado ou no Total?
+    # Geralmente Censo mostra o Total da base, independente do filtro de busca.
+    # Se quiser que os cards mudem conforme a busca, use 'qs.aggregate'.
+    # Aqui vou usar a base total de <10 anos para manter consistência.
+    qs_total = Crianca.objects.filter(data_nascimento__gt=data_corte)
+    
+    stats = qs_total.aggregate(
+        total=Count('id'),
+        meninos=Count('id', filter=Q(sexo='M')),
+        meninas=Count('id', filter=Q(sexo='F')),
+        bebes=Count('id', filter=Q(data_nascimento__gt=um_ano_atras))
+    )
+
+    # --- 5. PAGINAÇÃO ---
+    paginator = Paginator(qs, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'criancas': page_obj,
+        'total': stats['total'],     # Acessa o dicionário do aggregate
+        'meninos': stats['meninos'],
+        'meninas': stats['meninas'],
+        'bebes': stats['bebes'],
+    }
+
+    return render(request, 'censo_demografico.html', context)
 
 @never_cache
 @login_required
@@ -105,18 +221,12 @@ def cadastrar_crianca(request):
         if form.is_valid():
             nova_crianca = form.save(commit=False)
             nova_crianca.cadastrado_por = request.user
-            nova_crianca.save()
             
-            # MAGIA: Ao criar a criança, gera o cartão em branco baseado nas vacinas do sistema
-            vacinas_sistema = Vacina.objects.all()
-            for vacina in vacinas_sistema:
-                RegistroVacina.objects.create(
-                    crianca=nova_crianca,
-                    vacina=vacina,
-                    status='PENDENTE'
-                )
+            # AO SALVAR: O Signal do models.py roda e cria as vacinas automaticamente!
+            nova_crianca.save() 
             
-            return redirect('index')
+            # Redireciona direto para o cartão da criança nova (Melhor UX)
+            return redirect('cartao_vacina', nova_crianca.id)
     else:
         form = CriancaForm()
     
@@ -212,93 +322,7 @@ def calendario_guia(request):
     vacinas = Vacina.objects.all().order_by('idade_alvo_meses', 'nome')
     return render(request, 'calendario_guia.html', {'vacinas': vacinas})
 
-def censo_demografico(request):
-    # === 0. OTIMIZAÇÃO DE LEITURA ===
-    # O 'prefetch_related' carrega os dados filhos (registros) na memória
-    # O 'select_related' carrega os dados pais (vacina) na memória
-    todas_criancas = Crianca.objects.prefetch_related(
-        'registros__vacina' # Traz os registros E os dados da vacina (idade alvo)
-    ).all()
 
-    # Agora o loop roda quase instantâneo porque os dados já estão na memória RAM do servidor
-    for c in todas_criancas:
-        c.verificar_atrasos()
-
-    # === 1. ESTATÍSTICAS ===
-    qs_base = Crianca.objects.all()
-    um_ano_atras = date.today() - timedelta(days=365)
-    
-    estatisticas = qs_base.aggregate(
-        total=Count('id'),
-        meninos=Count('id', filter=Q(sexo='M')),
-        meninas=Count('id', filter=Q(sexo='F')),
-        bebes=Count('id', filter=Q(data_nascimento__gt=um_ano_atras))
-    )
-
-    # === 2. QUERYSET PRINCIPAL ===
-    # ATENÇÃO AQUI: Usamos 'registros' pois é o related_name no Model
-    lista_criancas = Crianca.objects.annotate(
-        tem_atraso=Count('registros', filter=Q(registros__status='ATRASADA'))
-    )
-
-    # Captura dados da URL
-    busca = request.GET.get('busca')
-    status = request.GET.get('status')
-    sexo = request.GET.get('sexo')
-    ordem = request.GET.get('ordem')
-
-    # --- LÓGICA DE FILTRAGEM ---
-    if busca:
-        print(f"Filtrando nome por: {busca}")
-        lista_criancas = lista_criancas.filter(nome__icontains=busca)
-    
-    if status == 'atrasada':
-        print("Filtrando por: ATRASADOS")
-        # Pega quem tem contagem de atrasos > 0
-        lista_criancas = lista_criancas.filter(tem_atraso__gt=0)
-    elif status == 'em_dia':
-        print("Filtrando por: EM DIA")
-        # Pega quem tem contagem de atrasos == 0
-        lista_criancas = lista_criancas.filter(tem_atraso=0)
-
-    if sexo:
-        print(f"Filtrando sexo por: {sexo}")
-        lista_criancas = lista_criancas.filter(sexo=sexo)
-
-    # --- ORDENAÇÃO ---
-    if ordem == 'nome':
-        lista_criancas = lista_criancas.order_by('nome')
-    elif ordem == 'idade_cresc':
-        lista_criancas = lista_criancas.order_by('-data_nascimento')
-    elif ordem == 'idade_dec':
-        lista_criancas = lista_criancas.order_by('data_nascimento')
-    else:
-        lista_criancas = lista_criancas.order_by('-data_nascimento')
-
-    # Contexto final
-    context = {
-        'criancas': lista_criancas,
-        'total': estatisticas['total'],
-        'meninos': estatisticas['meninos'],
-        'meninas': estatisticas['meninas'],
-        'bebes': estatisticas['bebes'],
-        'criancas_maiores': (estatisticas['total'] or 0) - (estatisticas['bebes'] or 0)
-    }
-    
-    # === PAGINAÇÃO ===
-    paginator = Paginator(lista_criancas, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-
-    # 5. CONTEXTO FINAL
-    context = {
-        'criancas': page_obj,
-        'total': estatisticas['total'],
-        'meninos': estatisticas['meninos'], 
-        'meninas': estatisticas['meninas'],
-        'bebes': estatisticas['bebes'],      
-    }
-    return render(request, 'censo_demografico.html', context)
 
 @never_cache
 @login_required

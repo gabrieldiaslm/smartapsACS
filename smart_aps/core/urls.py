@@ -22,7 +22,7 @@ urlpatterns = [
     # Rotas do Site (HTML)
     path('', views.index, name='index'),
     path('criancas/', views.lista_criancas, name='lista_criancas'),
-    path('crianca/nova/', views.cadastrar_crianca, name='cadastrar_crianca'),
+    path('crianca/nova/', views.cadastrar_crianca, name='novo_paciente'),
     path('crianca/<int:crianca_id>/cartao/', views.cartao_vacina, name='cartao_vacina'),
     path('vacina/<int:registro_id>/editar/', views.editar_registro, name='editar_registro'),
     path('calendario-guia/', views.calendario_guia, name='calendario_guia'),

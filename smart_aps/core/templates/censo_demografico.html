@@ -116,7 +116,7 @@
                             </td>
 
                             <td class="text-center">
-                                {% if crianca.status_geral == 'ATRASADO' %}
+                                {% if crianca.is_atrasado %} 
                                     <span class="badge bg-danger">
                                         <i class="fa-solid fa-triangle-exclamation"></i> Atrasado
                                     </span>
