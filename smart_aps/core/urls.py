@@ -1,11 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
-# Importar tudo de views de uma vez só facilita
+from rest_framework_simplejwt.views import (TokenObtainPairView, TokenRefreshView,)
 from core import views 
 from core.views import CriancaViewSet, RegistroVacinaViewSet
 
@@ -35,7 +31,7 @@ urlpatterns = [
     # Rota PWA Offline
     path('offline/', views.offline_view, name='offline'),
     
-    # ROTA DA API (O endereço será: http://localhost:8000/api/criancas/)
+    # ROTA DA API
     path('api/', include(router.urls)),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

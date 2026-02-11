@@ -22,10 +22,9 @@ class CriancaForm(forms.ModelForm):
             'sexo': forms.Select(attrs={'class': 'form-select'}),
         }
 
-# --- NOVO FORMULÁRIO ESPECÍFICO PARA APLICAÇÃO ---
+# Form pra aplicação
 class RegistroVacinaForm(forms.ModelForm):
 
-    # Mantemos a correção do Status para garantir as opções
     status = forms.ChoiceField(
         label="Situação / Status",
         choices=[
@@ -66,11 +65,9 @@ class RegistroVacinaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(RegistroVacinaForm, self).__init__(*args, **kwargs)
         
-        # Data padrão: Hoje
         if not self.initial.get('data_aplicacao'):
             self.initial['data_aplicacao'] = date.today()
 
-        # Obrigatórios
         self.fields['data_aplicacao'].required = True
         self.fields['lote'].required = True
         self.fields['fabricante'].required = True
@@ -79,12 +76,9 @@ class RegistroVacinaForm(forms.ModelForm):
         self.fields['local_aplicacao'].required = True
         self.fields['observacoes'].required = False
 
-        # Isso evita erro de validação do Django dizendo "Opção inválida"
-        # pois o Select tecnicamente está vazio no Python, mas cheio no HTML
         self.fields['lote'].widget.choices = [] 
         self.fields['fabricante'].widget.choices = []
         
-        # Truque: Se já tiver dados (edição), preenche as opções iniciais
         if self.instance.pk:
             self.fields['lote'].widget.choices = [(self.instance.lote, self.instance.lote)]
             self.fields['fabricante'].widget.choices = [(self.instance.fabricante, self.instance.fabricante)]

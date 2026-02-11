@@ -1,11 +1,11 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
-from django.db.models.signals import post_save # <--- Import necessário para automação
-from django.dispatch import receiver           # <--- Import necessário para automação
+from django.db.models.signals import post_save 
+from django.dispatch import receiver           
 from datetime import date
 
-# 1. Usuário (ACS)
+#  Usuário (ACS)
 class UsuarioACS(AbstractUser):
     cnes_unidade = models.CharField("CNES da Unidade", max_length=20, blank=True)
 
@@ -13,7 +13,7 @@ class UsuarioACS(AbstractUser):
         verbose_name = "Agente Comunitário de Saúde"
         verbose_name_plural = "Agentes Comunitários de Saúde"
 
-# 2. Criança (Paciente)
+# Criança (Paciente)
 class Crianca(models.Model):
     SEXO_CHOICES = [
         ('M', 'Masculino'),
@@ -27,8 +27,6 @@ class Crianca(models.Model):
     localidade = models.CharField(max_length=100)
     nome_mae = models.CharField("Nome da Mãe", max_length=200)
     sexo = models.CharField(max_length=1, choices=SEXO_CHOICES)
-    
-    # Audit
     criado_em = models.DateTimeField(auto_now_add=True)
     cadastrado_por = models.ForeignKey(UsuarioACS, on_delete=models.SET_NULL, null=True)
 
@@ -54,8 +52,6 @@ class Crianca(models.Model):
         hoje = date.today()
         idade_meses = self.idade_em_meses
         
-        # Pega pendentes onde a idade da criança já passou da idade da vacina
-        # Ex: Criança tem 4 meses, Vacina é de 2 meses e está PENDENTE -> Vira ATRASADA
         registros_para_atualizar = self.registros.filter(
             status='PENDENTE', 
             vacina__idade_alvo_meses__lt=idade_meses
@@ -91,7 +87,7 @@ class Crianca(models.Model):
     def __str__(self):
         return f"{self.nome} ({self.data_nascimento})"
 
-# 3. Definição da Vacina
+# Vacina
 class Vacina(models.Model):
     nome = models.CharField(max_length=100)
     descricao_doenca = models.CharField("Previne que doença", max_length=200)
@@ -121,7 +117,7 @@ class Vacina(models.Model):
         else:
             return f"{anos} {texto_anos} e {meses_restantes} Meses"
 
-# 4. Cartão de Vacina (O Registro da Aplicação)
+# 4. O Registro da Aplicação da Vacina
 class RegistroVacina(models.Model):
     STATUS_CHOICES = [
         ('PENDENTE', 'Em Aberto'),
@@ -153,7 +149,7 @@ class RegistroVacina(models.Model):
         ('OUTROS', 'Outros'),
     ]
 
-    # --- RELACIONAMENTOS ---
+    # relacionamentos
     crianca = models.ForeignKey(Crianca, on_delete=models.CASCADE, related_name='registros') 
     vacina = models.ForeignKey(Vacina, on_delete=models.CASCADE)
     aplicado_por = models.ForeignKey(
@@ -164,14 +160,11 @@ class RegistroVacina(models.Model):
         related_name='vacinas_aplicadas'
     )
 
-    # --- DADOS DO REGISTRO ---
-    # Importante: Mantivemos defaults em MAIÚSCULO para bater com as CHOICES
+    # Dados do registro
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')
     dose = models.CharField(max_length=50, blank=True, null=True) # Ex: 1ª Dose
     
-    # Campo auxiliar para ordenação rápida sem precisar de join com tabela Vacina
     idade_alvo = models.IntegerField(default=0) 
-    
     data_aplicacao = models.DateField(blank=True, null=True)
     
     # Detalhes Clínicos
@@ -211,10 +204,7 @@ class LoteVacina(models.Model):
         verbose_name_plural = "Lotes Disponíveis"
 
 
-# --- SINAL AUTOMÁTICO PARA CRIAR CARTÃO ---
-# Isso garante que a criança sempre nasça com o cartão de vacina, 
-# mesmo se criada pelo Admin do Django.
-
+# Sinal automatico pra criar cartão de vacina
 @receiver(post_save, sender=Crianca)
 def criar_cartao_vacina_automatico(sender, instance, created, **kwargs):
     if created:
@@ -226,7 +216,7 @@ def criar_cartao_vacina_automatico(sender, instance, created, **kwargs):
                 crianca=instance,
                 vacina=vacina,
                 dose=vacina.dose_padrao,
-                idade_alvo=vacina.idade_alvo_meses, # Preenche o campo auxiliar
+                idade_alvo=vacina.idade_alvo_meses,
                 status='PENDENTE'
             ))
         

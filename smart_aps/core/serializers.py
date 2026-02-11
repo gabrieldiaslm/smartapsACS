@@ -5,16 +5,13 @@ class RegistroVacinaSerializer(serializers.ModelSerializer):
     nome_vacina = serializers.CharField(source='vacina.nome', read_only=True)
     idade_alvo = serializers.IntegerField(source='vacina.idade_alvo_meses', read_only=True)
     dose = serializers.CharField(source='vacina.dose_padrao', read_only=True)
-    
-    # --- ESTA LINHA É O SEGREDO ---
-    # Sem isso, o React não sabe qual vacina buscar os lotes!
     vacina_id = serializers.IntegerField(source='vacina.id', read_only=True)
 
     class Meta:
         model = RegistroVacina
         fields = [
             'id', 
-            'vacina_id', # <--- Verifique se adicionou aqui na lista!
+            'vacina_id', 
             'nome_vacina', 
             'idade_alvo', 
             'status', 
@@ -23,9 +20,9 @@ class RegistroVacinaSerializer(serializers.ModelSerializer):
             'lote', 
             'fabricante', 
             'observacoes',
-            'estrategia',       # Adicionado para bater com o novo Model
-            'via_administracao', # Adicionado
-            'local_aplicacao'    # Adicionado
+            'estrategia',       
+            'via_administracao', 
+            'local_aplicacao' 
         ]
 
 class CriancaSerializer(serializers.ModelSerializer):
