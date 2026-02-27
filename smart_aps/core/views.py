@@ -212,25 +212,35 @@ def editar_registro(request, registro_id):
     registro = get_object_or_404(RegistroVacina, pk=registro_id)
     
     if request.method == 'POST':
+        # 1. Pega o estado intocável do banco ANTES de aplicar as mudanças
+        registro_antigo = RegistroVacina.objects.get(pk=registro_id)
+        
         form = RegistroVacinaForm(request.POST, instance=registro)
         if form.is_valid():
-            vacina_aplicada = form.save()
+            # 2. commit=False cria o objeto com os novos dados, mas não salva no banco ainda
+            registro_novo = form.save(commit=False)
             
-            # Lógica de estoque centralizada
-            if vacina_aplicada.lote and vacina_aplicada.status == 'APLICADA':
-                lote_atualizado = baixar_estoque_lote(vacina_aplicada.vacina, vacina_aplicada.lote)
+            # 3. Passa pela auditoria matemática para devolver ou descontar doses
+            auditar_e_ajustar_estoque(registro_antigo, registro_novo)
+            
+            # 4. Agora sim, salva o registro
+            registro_novo.save()
+            
+            # 5. Alerta de Estoque Baixo (Se for vacina da UBS)
+            if registro_novo.status == 'APLICADA' and not getattr(registro_novo, 'eh_transcricao', False) and registro_novo.lote_vinculado:
+                lote_atual = registro_novo.lote_vinculado
+                lote_atual.refresh_from_db() # Atualiza o valor exato que ficou no banco
                 
-                if lote_atualizado:
-                    lote_atualizado.refresh_from_db()
-                    if lote_atualizado.quantidade_disponivel <= 5:
-                        messages.warning(request, f"Atenção: Estoque baixo ({lote_atualizado.quantidade_disponivel} un).")
-                else:
-                    messages.error(request, f"Erro ou estoque zerado para o lote {vacina_aplicada.lote}.")
+                if lote_atual.quantidade_disponivel <= 5:
+                    messages.warning(request, f"Atenção: Estoque baixo para o Lote {lote_atual.numero_lote} ({lote_atual.quantidade_disponivel} doses restantes).")
 
             messages.success(request, 'Atualizado com sucesso!')
             return redirect('cartao_vacina', crianca_id=registro.crianca.id)
     else:
-        form = RegistroVacinaForm(instance=registro, initial={'status': 'APLICADA'})
+        form = RegistroVacinaForm(
+            instance=registro, 
+            initial={'status': 'APLICADA'}
+        )
 
     return render(request, 'registro_form.html', {'form': form, 'registro': registro, 'crianca': registro.crianca})
 
@@ -313,3 +323,48 @@ def offline_view(request):
 def usuario_atual(request):
     user = request.user
     return Response({'id': user.id, 'username': user.username, 'full_name': user.get_full_name() or user.username})
+
+def auditar_e_ajustar_estoque(registro_antigo, registro_novo):
+    """
+    Compara o estado antigo e novo da vacina para ajustar o estoque.
+    Previne drenagem fantasma e devolve doses em caso de troca ou cancelamento.
+    """
+    # Verifica se a vacina estava consumindo estoque da UBS no estado ANTIGO
+    era_aplicada_ubs = (registro_antigo.status == 'APLICADA' 
+                        and not getattr(registro_antigo, 'eh_transcricao', False) 
+                        and registro_antigo.lote_vinculado)
+
+    # Verifica se a vacina vai consumir estoque da UBS no estado NOVO
+    agora_aplicada_ubs = (registro_novo.status == 'APLICADA' 
+                          and not getattr(registro_novo, 'eh_transcricao', False) 
+                          and registro_novo.lote_vinculado)
+
+    lote_antigo = registro_antigo.lote_vinculado
+    lote_novo = registro_novo.lote_vinculado
+
+    # CENÁRIO 1: Troca de Lote (Era aplicada, continua aplicada, mas o Lote mudou)
+    if era_aplicada_ubs and agora_aplicada_ubs and lote_antigo != lote_novo:
+        # Devolve 1 dose pro lote que foi removido
+        if lote_antigo:
+            lote_antigo.quantidade_disponivel = F('quantidade_disponivel') + 1
+            lote_antigo.save()
+        # Subtrai 1 dose do novo lote escolhido
+        if lote_novo:
+            lote_novo.quantidade_disponivel = F('quantidade_disponivel') - 1
+            lote_novo.save()
+
+    # CENÁRIO 2: Nova Aplicação (Estava pendente e agora virou Aplicada da UBS)
+    elif not era_aplicada_ubs and agora_aplicada_ubs:
+        if lote_novo:
+            lote_novo.quantidade_disponivel = F('quantidade_disponivel') - 1
+            lote_novo.save()
+
+    # CENÁRIO 3: Cancelamento ou Virou Transcrição (Era da UBS e agora não é mais)
+    elif era_aplicada_ubs and not agora_aplicada_ubs:
+        if lote_antigo:
+            lote_antigo.quantidade_disponivel = F('quantidade_disponivel') + 1
+            lote_antigo.save()
+            
+    # CENÁRIO 4: Nenhuma mudança que afete o estoque (Ex: Apenas editou uma observação)
+    else:
+        pass # Não faz nada, preservando o estoque intacto!
