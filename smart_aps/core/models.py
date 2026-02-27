@@ -152,13 +152,6 @@ class RegistroVacina(models.Model):
     # relacionamentos
     crianca = models.ForeignKey(Crianca, on_delete=models.CASCADE, related_name='registros') 
     vacina = models.ForeignKey(Vacina, on_delete=models.CASCADE)
-    aplicado_por = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True, 
-        blank=True,
-        related_name='vacinas_aplicadas'
-    )
 
     # Dados do registro
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')
@@ -172,7 +165,25 @@ class RegistroVacina(models.Model):
     via_administracao = models.CharField(max_length=50, choices=VIAS, default='INTRAMUSCULAR')
     local_aplicacao = models.CharField(max_length=50, choices=LOCAIS, blank=True, null=True)
     
-    # Rastreabilidade
+    # ==========================================
+    # PADRÃO E-SUS: TRANSCRIÇÃO VS APLICAÇÃO LOCAL
+    # ==========================================
+    eh_transcricao = models.BooleanField(
+        "É Transcrição (Registro Anterior)?", 
+        default=False,
+        help_text="Marque se a vacina foi aplicada em outra unidade ou data passada."
+    )
+
+    # Vínculo real com o estoque da UBS
+    lote_vinculado = models.ForeignKey(
+        'LoteVacina', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='aplicacoes_registro'
+    )
+
+    # Rastreabilidade (Campos de Texto para Histórico/Transcrição)
     lote = models.CharField(max_length=50, blank=True, null=True)
     fabricante = models.CharField(max_length=100, blank=True, null=True)
     observacoes = models.TextField(blank=True, null=True)
@@ -185,6 +196,16 @@ class RegistroVacina(models.Model):
             models.Index(fields=['crianca']),
         ]
 
+    def save(self, *args, **kwargs):
+        # MÁGICA DA INTEGRIDADE:
+        # Se NÃO for transcrição e tiver um lote da UBS selecionado,
+        # copia os dados para os campos de texto para garantir o histórico permanente.
+        if not self.eh_transcricao and self.lote_vinculado:
+            self.lote = self.lote_vinculado.numero_lote
+            self.fabricante = self.lote_vinculado.fabricante
+            
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.vacina.nome} - {self.crianca.nome} ({self.status})"
 
@@ -193,17 +214,24 @@ class LoteVacina(models.Model):
     vacina = models.ForeignKey(Vacina, on_delete=models.CASCADE, related_name='lotes')
     numero_lote = models.CharField(max_length=50)
     fabricante = models.CharField(max_length=100)
-    quantidade_disponivel = models.IntegerField(default=0)
+    quantidade_frascos = models.PositiveIntegerField("Frascos Recebidos", default =1)
+    doses_por_frasco = models.PositiveBigIntegerField('Doses por Frasco', default=1, help_text="Ex: 1 para dose única, 10 para frasco multidose.")
+    quantidade_disponivel = models.IntegerField('Doses Disponíveis', default=0)
     validade = models.DateField(blank=True, null=True)
 
+    def save(self, *args, **kwargs):
+        if not self.pk and self.quantidade_disponivel == 0:
+            self.quantidade_disponivel = self.quantidade_frascos * self.doses_por_frasco
+        
+        super().save(*args, **kwargs)
+    
     def __str__(self):
-        return f"{self.vacina.nome} - Lote: {self.numero_lote} ({self.fabricante})"
+        return f'{self.vacina.nome} - Lote: {self.numero_lote} ({self.quantidade_disponivel} doses restantes)'
 
     class Meta:
-        verbose_name = "Lote Disponível"
+        verbose_name = 'Lote Disponível'
         verbose_name_plural = "Lotes Disponíveis"
-
-
+        
 # Sinal automatico pra criar cartão de vacina
 @receiver(post_save, sender=Crianca)
 def criar_cartao_vacina_automatico(sender, instance, created, **kwargs):

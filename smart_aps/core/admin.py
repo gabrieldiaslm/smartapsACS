@@ -25,7 +25,8 @@ class RegistroVacinaAdmin(admin.ModelAdmin):
 
 @admin.register(LoteVacina)
 class LoteVacinaAdmin(admin.ModelAdmin):
-    list_display = ('vacina', 'numero_lote', 'fabricante', 'validade', 'quantidade_disponivel')
-    search_fields = ('numero_lote', 'fabricante', 'vacina__nome')
-    list_filter = ('fabricante', 'vacina')
-    ordering = ('vacina', 'validade')
+    list_display = ('vacina', 'numero_lote', 'fabricante', 'quantidade_frascos', 'doses_por_frasco', 'quantidade_disponivel')
+    
+    # Faz com que o campo de total disponível não possa ser editado manualmente,
+    # forçando o usuário a usar a lógica dos frascos x doses.
+    readonly_fields = ('quantidade_disponivel',)

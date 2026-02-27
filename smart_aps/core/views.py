@@ -49,7 +49,8 @@ def get_criancas_queryset(filtrar_idade=True):
 
 def baixar_estoque_lote(vacina, lote_nome):
     """Lógica centralizada para baixar estoque."""
-    if not lote_nome: return
+    if not lote_nome: 
+        return None
     
     lote_obj = LoteVacina.objects.filter(vacina=vacina, numero_lote__iexact=lote_nome).first()
     
@@ -236,7 +237,9 @@ def editar_registro(request, registro_id):
 # --- OUTRAS VIEWS SIMPLES ---
 
 def api_lotes_por_vacina(request, vacina_id):
-    lotes = LoteVacina.objects.filter(vacina_id=vacina_id).values('numero_lote', 'fabricante', 'quantidade_disponivel')
+    lotes = LoteVacina.objects.filter(vacina_id=vacina_id).values(
+        'numero_lote', 'fabricante', 'doses_disponiveis'
+    )
     return JsonResponse(list(lotes), safe=False)
 
 @user_passes_test(is_admin)

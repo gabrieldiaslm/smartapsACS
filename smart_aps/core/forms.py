@@ -1,5 +1,5 @@
 from django import forms
-from .models import Crianca, RegistroVacina, UsuarioACS
+from .models import Crianca, LoteVacina, RegistroVacina, UsuarioACS
 from django.contrib.auth.forms import UserCreationForm
 from datetime import date
 
@@ -25,41 +25,38 @@ class CriancaForm(forms.ModelForm):
 # Form pra aplicação
 class RegistroVacinaForm(forms.ModelForm):
 
-    status = forms.ChoiceField(
-        label="Situação / Status",
-        choices=[
-            ('PENDENTE', 'Pendente'),
-            ('APLICADA', 'Aplicada'),
-            ('ATRASADA', 'Atrasada'),
-        ],
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-
     class Meta:
         model = RegistroVacina
         fields = [
-            'status', 'estrategia', 'data_aplicacao', 'via_administracao', 
-            'local_aplicacao', 'lote', 'fabricante', 'observacoes'
+            'status', 'eh_transcricao', 'estrategia', 'data_aplicacao', 
+            'via_administracao', 'local_aplicacao', 
+            'lote_vinculado', 'lote', 'fabricante', 'observacoes'
         ]
         
         widgets = {
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            # Checkbox estilizado como "Switch" do Bootstrap (fica bem profissional)
+            'eh_transcricao': forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_eh_transcricao', 'role': 'switch'}),
             'estrategia': forms.Select(attrs={'class': 'form-select'}),
             'via_administracao': forms.Select(attrs={'class': 'form-select'}),
             'local_aplicacao': forms.Select(attrs={'class': 'form-select'}),
             'data_aplicacao': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'lote': forms.Select(attrs={'class': 'form-select', 'id': 'id_lote'}),
-            'fabricante': forms.Select(attrs={'class': 'form-select', 'id': 'id_fabricante'}),
+            
+            # Select inteligente que virá do banco de dados
+            'lote_vinculado': forms.Select(attrs={'class': 'form-select', 'id': 'id_lote_vinculado'}),
+            
+            # Textos livres (usados apenas quando eh_transcricao for verdadeiro)
+            'lote': forms.TextInput(attrs={'class': 'form-control', 'id': 'id_lote_texto'}),
+            'fabricante': forms.TextInput(attrs={'class': 'form-control', 'id': 'id_fabricante_texto'}),
+            
             'observacoes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
-        
+
         labels = {
-            'estrategia': 'Estratégia',
-            'via_administracao': 'Via de Administração',
-            'local_aplicacao': 'Local de Aplicação',
-            'data_aplicacao': 'Data da Aplicação',
-            'lote': 'Lote',
-            'fabricante': 'Laboratório / Fabricante',
-            'observacoes': 'Observações (Opcional)',
+            'eh_transcricao': 'Registrar como Transcrição (Vacina de fora/anterior)',
+            'lote_vinculado': 'Selecione o Lote do Estoque da UBS',
+            'lote': 'Lote (Texto livre)',
+            'fabricante': 'Fabricante (Texto livre)',
         }
 
     def __init__(self, *args, **kwargs):
@@ -69,16 +66,22 @@ class RegistroVacinaForm(forms.ModelForm):
             self.initial['data_aplicacao'] = date.today()
 
         self.fields['data_aplicacao'].required = True
-        self.fields['lote'].required = True
-        self.fields['fabricante'].required = True
         self.fields['estrategia'].required = True
         self.fields['via_administracao'].required = True
         self.fields['local_aplicacao'].required = True
-        self.fields['observacoes'].required = False
-
-        self.fields['lote'].widget.choices = [] 
-        self.fields['fabricante'].widget.choices = []
         
-        if self.instance.pk:
-            self.fields['lote'].widget.choices = [(self.instance.lote, self.instance.lote)]
-            self.fields['fabricante'].widget.choices = [(self.instance.fabricante, self.instance.fabricante)]
+        # Como o preenchimento depende do usuário (transcrição ou estoque),
+        # não podemos forçar required no backend. Faremos isso via JavaScript.
+        self.fields['lote_vinculado'].required = False
+        self.fields['lote'].required = False
+        self.fields['fabricante'].required = False
+
+        # --- O PULO DO GATO ---
+        # Filtra os lotes para mostrar SÓ os lotes dessa vacina que têm estoque!
+        if self.instance and hasattr(self.instance, 'vacina') and self.instance.vacina:
+            self.fields['lote_vinculado'].queryset = LoteVacina.objects.filter(
+                vacina=self.instance.vacina, 
+                quantidade_disponivel__gt=0
+            )
+            # Define o texto vazio padrão
+            self.fields['lote_vinculado'].empty_label = "Selecione o Lote da Geladeira..."
