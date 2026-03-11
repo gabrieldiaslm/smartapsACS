@@ -26,7 +26,14 @@ function Home() {
         </div>
 
         <div className="row g-4">
-            
+            {/* 4. CADASTRAR CRIANÇAS */}
+            <div className="col-md-6">
+                <Link to="#" className="card shadow-sm hover-effect" style={cardStyle}>
+                    <i className="fa-solid fa-lock fa-3x mb-2"></i>
+                    <h4 className="fw-bold">Cadastrar criança</h4>
+                </Link>
+            </div>
+
             {/* 1. CONTROLE DE PACIENTES (Lista) */}
             <div className="col-md-6">
                 {/* Atualizei o link para /criancas que é a lista que criamos */}
@@ -52,13 +59,7 @@ function Home() {
                 </Link>
             </div>
 
-            {/* 4. desativado */}
-            <div className="col-md-6">
-                <Link to="#" className="card shadow-sm hover-effect" style={{...cardStyle, backgroundColor: '#757575', cursor: 'not-allowed'}}>
-                    <i className="fa-solid fa-lock fa-3x mb-2"></i>
-                    <h4 className="fw-bold">Desativado (Cadastrar criança)</h4>
-                </Link>
-            </div>
+
 
         </div>
         </div>

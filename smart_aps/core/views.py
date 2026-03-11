@@ -248,7 +248,7 @@ def editar_registro(request, registro_id):
 
 def api_lotes_por_vacina(request, vacina_id):
     lotes = LoteVacina.objects.filter(vacina_id=vacina_id).values(
-        'numero_lote', 'fabricante', 'doses_disponiveis'
+        'id', 'numero_lote', 'fabricante', 'quantidade_disponivel'
     )
     return JsonResponse(list(lotes), safe=False)
 
