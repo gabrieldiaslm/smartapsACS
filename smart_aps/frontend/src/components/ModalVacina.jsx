@@ -71,13 +71,15 @@ function ModalVacina({ registro, onClose, onSave }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    // Prepara o pacote de dados limpando campos inúteis antes de enviar
     const payload = { ...formData }
     if (payload.eh_transcricao) {
         payload.lote_vinculado = null // Limpa estoque se for transcrição
     } else {
-        payload.lote = null // Deixa o Django auto-preencher no backend
+        payload.lote = null 
         payload.fabricante = null
+        if (payload.lote_vinculado === '') {
+            payload.lote_vinculado = null;
+        }
     }
 
     try {

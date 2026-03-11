@@ -10,8 +10,7 @@ import Detalhes from './pages/Detalhes'
 import Login from './pages/Login'
 import Censo from './pages/Censo'
 import GuiaVacinal from './pages/GuiaVacinal'
-// Se você tiver a página de cadastro, importe ela também:
-// import CadastroCrianca from './pages/CadastroCrianca'
+import CadastrarCrianca from './pages/CadastrarCrianca'
 
 function App() {
   return (
@@ -52,7 +51,11 @@ function App() {
             <GuiaVacinal />
           </ProtectedRoute>
         } />
-
+        <Route path="/cadastrar-crianca" element={
+          <ProtectedRoute>
+            <CadastrarCrianca/>
+          </ProtectedRoute>
+        } />
 
       </Routes>
     </BrowserRouter>

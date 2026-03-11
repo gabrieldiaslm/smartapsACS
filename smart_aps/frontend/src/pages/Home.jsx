@@ -12,7 +12,6 @@ function Home() {
     justifyContent: 'center',
     alignItems: 'center',
     textDecoration: 'none',
-    // transition: 'transform 0.2s' <--- REMOVI DAQUI E PASSEI PRO CSS ABAIXO
   }
 
   return (
@@ -28,34 +27,33 @@ function Home() {
         <div className="row g-4">
             {/* 4. CADASTRAR CRIANÇAS */}
             <div className="col-md-6">
-                <Link to="#" className="card shadow-sm hover-effect" style={cardStyle}>
+                <Link to="cadastrar-crianca" className="card shadow-sm hover-effect" style={cardStyle}>
                     <i className="fa-solid fa-lock fa-3x mb-2"></i>
                     <h4 className="fw-bold">Cadastrar criança</h4>
+                </Link>
+            </div>
+            {/* 2. GUIA VACINAL */}
+            <div className="col-md-6">
+                <Link to="/guia-vacinal" className="card shadow-sm hover-effect" style={cardStyle}>
+                    <i className="fa-solid fa-book-medical fa-3x mb-2"></i>
+                    <h4 className="fw-bold">Calendário Vacinal</h4>
                 </Link>
             </div>
 
             {/* 1. CONTROLE DE PACIENTES (Lista) */}
             <div className="col-md-6">
-                {/* Atualizei o link para /criancas que é a lista que criamos */}
                 <Link to="/lista" className="card shadow-sm hover-effect" style={cardStyle}>
                     <i className="fa-solid fa-users fa-3x mb-2"></i>
-                    <h4 className="fw-bold">Controle de Pacientes</h4>
+                    <h4 className="fw-bold">Cartão de Vacina</h4>
                 </Link>
             </div>
 
-            {/* 2. GUIA VACINAL */}
-            <div className="col-md-6">
-                <Link to="/guia-vacinal" className="card shadow-sm hover-effect" style={cardStyle}>
-                    <i className="fa-solid fa-book-medical fa-3x mb-2"></i>
-                    <h4 className="fw-bold">Guia Vacinal</h4>
-                </Link>
-            </div>
 
             {/* 3. CENSO DEMOGRÁFICO */}
             <div className="col-md-6">
                 <Link to="/censo" className="card shadow-sm hover-effect" style={cardStyle}>
                     <i className="fa-solid fa-chart-pie fa-3x mb-2"></i>
-                    <h4 className="fw-bold">Censo Demográfico</h4>
+                    <h4 className="fw-bold">Crianças</h4>
                 </Link>
             </div>
 

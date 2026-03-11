@@ -70,22 +70,38 @@ class VacinaViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = VacinaSerializer
     pagination_class = None
 
+from datetime import date, timedelta
+from django.db.models import Count, Q
+from django.core.cache import cache
+from rest_framework import viewsets, filters
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
+
+# Ajuste os imports abaixo conforme o nome do seu app (ex: core.models)
+from .models import Crianca, Vacina, RegistroVacina
+from .serializers import CriancaSerializer, CriancaListSerializer
+
 class CriancaViewSet(viewsets.ModelViewSet):
-    serializer_class = CriancaSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     search_fields = ['nome', 'cns', 'nome_mae']
     filterset_fields = ['sexo', 'localidade']
+
     def get_serializer_class(self):
-        # A MÁGICA: Se a ação for 'list' (listar tabela/paginação), usa o serializador "dieta"
+        """
+        MÁGICA DE PERFORMANCE: 
+        Se for listar a tabela (vários registros), usa o serializador de dieta.
+        Se for abrir o perfil (1 registro) ou criar/editar, usa o completão.
+        """
         if self.action == 'list':
             return CriancaListSerializer
-        # Para 'retrieve' (abrir 1 paciente), 'create', 'update', usa o completão
-        return super().get_serializer_class()
+        return CriancaSerializer
+
     def get_queryset(self):
-        # 1. Troque a função pesada por uma query simples, limpa e com prefetch para a RAM
+        # Prefetch para evitar o problema N+1 ao calcular o status_geral
         qs = Crianca.objects.all().prefetch_related('registros')
 
-        # 2. Bulk Update (Solução 2) continua intacta e rápida
+        # Atualização em Lote (Bulk Update) ultrarrápida
         if self.request.query_params.get('atualizar') == 'true':
             hoje = date.today()
             todas_vacinas = Vacina.objects.all()
@@ -98,16 +114,13 @@ class CriancaViewSet(viewsets.ModelViewSet):
                     crianca__data_nascimento__lt=data_limite
                 ).update(status='ATRASADA')
 
-        # 3. O SEGREDO DA VELOCIDADE: Filtros nativos (Join simples) em vez de Annotate
+        # Filtro Nativo super leve para evitar falha no Count() da paginação
         status_filter = self.request.query_params.get('status_filtro')
         if status_filter == 'ATRASADO':
-            # Traz crianças que têm pelo menos UM registro 'ATRASADA'
             qs = qs.filter(registros__status='ATRASADA').distinct()
         elif status_filter == 'EM_DIA':
-            # Exclui crianças que têm qualquer registro 'ATRASADA'
             qs = qs.exclude(registros__status='ATRASADA')
 
-        # 4. Ordenação simples
         ordem = self.request.query_params.get('ordem')
         if ordem == 'nome': qs = qs.order_by('nome')
         elif ordem == 'idade_cresc': qs = qs.order_by('-data_nascimento')
@@ -115,23 +128,53 @@ class CriancaViewSet(viewsets.ModelViewSet):
         else: qs = qs.order_by('-id')
 
         return qs
+
+    def perform_create(self, serializer):
+        """
+        Garante que ao criar uma criança nova, o sistema já calcule os atrasos
+        imediatamente, impedindo que crianças de 5 anos fiquem com status 'Pendente'.
+        """
+        nova_crianca = serializer.save()
+        nova_crianca.verificar_atrasos()
+        
+        # Limpa o cache das estatísticas para incluir essa nova criança no Censo!
+        cache.delete('api_estatisticas_censo')
+
+    def perform_destroy(self, instance):
+        """
+        Garante que se você deletar uma criança, os números do Censo sejam recalculados.
+        """
+        instance.delete()
+        cache.delete('api_estatisticas_censo')
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Toda vez que o enfermeiro abre a caderneta, o sistema olha pro relógio e
+        verifica se alguma vacina que estava pendente ontem, venceu hoje.
+        """
+        instance = self.get_object()
+        instance.verificar_atrasos()
+        
+        # Busca a criança atualizada no banco para mandar pro React as tarjas vermelhas corretas
+        instance_atualizada = self.get_queryset().get(pk=instance.pk)
+        serializer = self.get_serializer(instance_atualizada)
+        return Response(serializer.data)
     
     @action(detail=False, methods=['get'])
     def estatisticas(self, request):
-        # Tenta pegar da memória RAM do servidor
+        """
+        Dashboard do Censo Demográfico com Cache e corte de 10 anos.
+        """
         dados = cache.get('api_estatisticas_censo')
 
         if not dados:
             hoje = date.today()
             um_ano_atras = hoje - timedelta(days=365)
-            
-            # Corte de 10 anos exatos (considerando 2 anos bissextos na conta = 3652 dias)
             dez_anos_atras = hoje - timedelta(days=3652)
             
-            # 1. Filtramos PRIMEIRO a base para excluir quem tem 10 anos ou mais
+            # Filtra apenas crianças do calendário infantil (menores de 10 anos)
             base_infantil = Crianca.objects.filter(data_nascimento__gt=dez_anos_atras)
             
-            # 2. Fazemos a contagem em cima dessa base já enxugada
             dados = base_infantil.aggregate(
                 total=Count('id'),
                 meninos=Count('id', filter=Q(sexo='M')),
@@ -139,7 +182,7 @@ class CriancaViewSet(viewsets.ModelViewSet):
                 bebes=Count('id', filter=Q(data_nascimento__gt=um_ano_atras))
             )
             
-            # Salva no cache por 1 hora
+            # Guarda na memória RAM por 1 hora
             cache.set('api_estatisticas_censo', dados, 3600)
             
         return Response(dados)
@@ -147,15 +190,17 @@ class CriancaViewSet(viewsets.ModelViewSet):
 class RegistroVacinaViewSet(viewsets.ModelViewSet):
     queryset = RegistroVacina.objects.all()
     serializer_class = RegistroVacinaSerializer
-    http_method_names = ['get', 'patch', 'put', 'head', 'options']
 
+    # Essa é a função que o DRF chama quando recebe o PATCH do React
     def perform_update(self, serializer):
-        registro_antigo = self.get_object()
-        estava_aplicada = registro_antigo.status == 'APLICADA'
+        # 1. Pega como a vacina estava ANTES da edição
+        registro_antigo = RegistroVacina.objects.get(pk=self.get_object().pk)
+        
+        # 2. Salva a nova versão com os dados que vieram do React
         registro_novo = serializer.save()
-
-        if registro_novo.status == 'APLICADA' and not estava_aplicada:
-            baixar_estoque_lote(registro_novo.vacina, registro_novo.lote)
+        
+        # 3. Roda a nossa inteligência para descontar ou devolver a dose!
+        auditar_e_ajustar_estoque(registro_antigo, registro_novo)
 
 # --- VIEWS (TEMPLATES) ---
 

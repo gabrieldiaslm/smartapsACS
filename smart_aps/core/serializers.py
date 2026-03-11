@@ -9,21 +9,7 @@ class RegistroVacinaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RegistroVacina
-        fields = [
-            'id', 
-            'vacina_id', 
-            'nome_vacina', 
-            'idade_alvo', 
-            'status', 
-            'data_aplicacao', 
-            'dose', 
-            'lote', 
-            'fabricante', 
-            'observacoes',
-            'estrategia',       
-            'via_administracao', 
-            'local_aplicacao' 
-        ]
+        fields = '__all__'
 
 class CriancaSerializer(serializers.ModelSerializer):
     idade_formatada = serializers.ReadOnlyField()

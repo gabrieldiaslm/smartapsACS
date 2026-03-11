@@ -120,9 +120,9 @@ function Censo() {
                 <div className="col-md-4">
                     <div className="input-group"><span className="input-group-text bg-white"><i className="fa-solid fa-search"></i></span><input type="text" className="form-control" placeholder="Buscar..." value={busca} onChange={handleFiltroChange(setBusca)}/></div>
                 </div>
-                <div className="col-md-2"><select className="form-select" value={statusFiltro} onChange={handleFiltroChange(setStatusFiltro)}><option value="">Todos</option><option value="EM_DIA">✅ Em dia</option><option value="ATRASADO">⚠️ Atrasado</option></select></div>
+                <div className="col-md-2"><select className="form-select" value={statusFiltro} onChange={handleFiltroChange(setStatusFiltro)}><option value="">Todos</option><option value="EM_DIA">Em dia</option><option value="ATRASADO">Atrasado</option></select></div>
                 <div className="col-md-2"><select className="form-select" value={sexo} onChange={handleFiltroChange(setSexo)}><option value="">Ambos</option><option value="M">Masculino</option><option value="F">Feminino</option></select></div>
-                <div className="col-md-2"><select className="form-select" value={ordem} onChange={handleFiltroChange(setOrdem)}><option value="idade_dec">Mais novos</option><option value="nome">A-Z</option></select></div>
+                <div className="col-md-2"><select className="form-select" value={ordem} onChange={handleFiltroChange(setOrdem)}><option value="idade_dec">Mais velhos</option><option value="idade_inc">Mais novos</option><option value="nome">A-Z</option></select></div>
                 <div className="col-md-2"><button className="btn btn-outline-secondary w-100" onClick={limparFiltros}>Limpar</button></div>
             </div>
         </div>
