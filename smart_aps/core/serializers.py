@@ -38,6 +38,24 @@ class CriancaSerializer(serializers.ModelSerializer):
             'status_geral', 'registros'
         ]
 
+class CriancaListSerializer(serializers.ModelSerializer):
+    """
+    Serializador super leve usado APENAS para as listas (Censo e Controle).
+    Ele ignora o histórico de vacinas para a página carregar instantaneamente.
+    """
+    class Meta:
+        model = Crianca
+        fields = [
+            'id', 
+            'nome', 
+            'localidade', 
+            'cns', 
+            'nome_mae', 
+            'sexo', 
+            'idade_formatada', 
+            'status_geral'
+        ]
+
 class VacinaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vacina

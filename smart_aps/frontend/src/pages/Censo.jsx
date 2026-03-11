@@ -7,7 +7,10 @@ import Pagination from '../components/Pagination'
 function Censo() {
   const [criancas, setCriancas] = useState([])
   const [stats, setStats] = useState({ total: 0, meninos: 0, meninas: 0, bebes: 0 })
-  const [loading, setLoading] = useState(true)
+  
+  // Separamos os loadings para não piscar a tela inteira
+  const [loadingStats, setLoadingStats] = useState(true)
+  const [loadingLista, setLoadingLista] = useState(true)
 
   // Filtros
   const [busca, setBusca] = useState('')
@@ -20,53 +23,70 @@ function Censo() {
   const [totalItems, setTotalItems] = useState(0)
   const PAGE_SIZE = 10 
 
-  const carregarDados = (paginaAtual = 1) => {
-    setLoading(true)
+  // 1. CARREGA ESTATÍSTICAS (Roda APENAS 1 VEZ quando a tela abre)
+  useEffect(() => {
+    api.get('criancas/estatisticas/')
+      .then(res => {
+        setStats(res.data)
+        setLoadingStats(false)
+      })
+      .catch(err => console.error("Erro nas estatísticas:", err))
+  }, [])
+
+  // 2. CARREGA A LISTA (Otimizado: Sem atraso na abertura da tela)
+  useEffect(() => {
+    setLoadingLista(true)
     
-    const params = {
-      search: busca,
-      status_filtro: statusFiltro,
-      sexo: sexo,
-      ordem: ordem,
-      page: paginaAtual 
+    // AbortController cancela a requisição anterior se o usuário digitar muito rápido
+    const controller = new AbortController()
+
+    // O PULO DO GATO: Se o campo de busca estiver vazio, carrega na hora (0ms). 
+    // Só aplica o atraso de 300ms se o usuário estiver ativamente digitando um nome.
+    const delay = busca.trim() !== '' ? 300 : 0
+
+    const timeout = setTimeout(() => {
+      const params = {
+        search: busca,
+        status_filtro: statusFiltro,
+        sexo: sexo,
+        ordem: ordem,
+        page: page 
+      }
+
+      api.get('criancas/', { params, signal: controller.signal })
+        .then(res => {
+          setCriancas(res.data.results)
+          setTotalItems(res.data.count)
+          setLoadingLista(false)
+        })
+        .catch(err => {
+          if (err.name !== 'CanceledError') {
+            console.error("Erro na lista:", err)
+            setLoadingLista(false)
+          }
+        })
+    }, delay)
+
+    // Limpeza do useEffect
+    return () => {
+      clearTimeout(timeout)
+      controller.abort() 
     }
+  }, [busca, statusFiltro, sexo, ordem, page]) // Dependências corretas
 
-    // Busca Lista Paginada
-    const reqLista = api.get('criancas/', { params })
-    // Busca Stats (Não muda com a página, só com filtros)
-    const reqStats = api.get('criancas/estatisticas/', { params })
-
-    Promise.all([reqLista, reqStats])
-      .then(([resLista, resStats]) => {
-        setCriancas(resLista.data.results) // Pega results
-        setTotalItems(resLista.data.count) // Pega count
-        setStats(resStats.data)
-        setLoading(false)
-      })
-      .catch(err => {
-        console.error("Erro ao carregar censo:", err)
-        setLoading(false)
-      })
+  // 3. HANDLERS
+  const handleFiltroChange = (setter) => (e) => {
+    setter(e.target.value)
+    setPage(1) // Volta para página 1 sempre que mexer num filtro
   }
 
-  // Se mudar qualquer filtro, reseta para página 1
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setPage(1)
-      carregarDados(1)
-    }, 300)
-    return () => clearTimeout(timeout)
-  }, [busca, statusFiltro, sexo, ordem])
-
-  // Troca de página apenas
   const handlePageChange = (newPage) => {
     setPage(newPage)
-    carregarDados(newPage)
-    window.scrollTo(0, 0)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const limparFiltros = () => {
-    setBusca(''); setStatusFiltro(''); setSexo(''); setOrdem('idade_dec');
+    setBusca(''); setStatusFiltro(''); setSexo(''); setOrdem('idade_dec'); setPage(1);
   }
 
   return (
@@ -86,39 +106,46 @@ function Censo() {
             </button>
         </div>
 
-        {/* Cards Estatísticas */}
+        {/* Cards Estatísticas (Mostra skeleton ou spinner se loadingStats for true) */}
         <div className="row g-3 mb-4">
-            <div className="col-md-3"><div className="card shadow-sm border-primary text-center py-2"><small className="fw-bold text-muted">Total</small><h2 className="fw-bold text-primary m-0">{stats.total}</h2></div></div>
-            <div className="col-md-3"><div className="card shadow-sm border-0 text-center py-2" style={{backgroundColor: '#e3f2fd'}}><small className="fw-bold text-primary">Meninos</small><h2 className="fw-bold text-primary m-0">{stats.meninos}</h2></div></div>
-            <div className="col-md-3"><div className="card shadow-sm border-0 text-center py-2" style={{backgroundColor: '#fce4ec'}}><small className="fw-bold text-danger">Meninas</small><h2 className="fw-bold text-danger m-0">{stats.meninas}</h2></div></div>
-            <div className="col-md-3"><div className="card shadow-sm border-success text-center py-2"><small className="fw-bold text-success">Bebês (&lt;1 ano)</small><h2 className="fw-bold text-success m-0">{stats.bebes}</h2></div></div>
+            <div className="col-md-3"><div className="card shadow-sm border-primary text-center py-2"><small className="fw-bold text-muted">Total (até 9 anos)</small><h2 className="fw-bold text-primary m-0">{loadingStats ? '...' : stats.total}</h2></div></div>
+            <div className="col-md-3"><div className="card shadow-sm border-0 text-center py-2" style={{backgroundColor: '#e3f2fd'}}><small className="fw-bold text-primary">Meninos</small><h2 className="fw-bold text-primary m-0">{loadingStats ? '...' : stats.meninos}</h2></div></div>
+            <div className="col-md-3"><div className="card shadow-sm border-0 text-center py-2" style={{backgroundColor: '#fce4ec'}}><small className="fw-bold text-danger">Meninas</small><h2 className="fw-bold text-danger m-0">{loadingStats ? '...' : stats.meninas}</h2></div></div>
+            <div className="col-md-3"><div className="card shadow-sm border-success text-center py-2"><small className="fw-bold text-success">Bebês (&lt;1 ano)</small><h2 className="fw-bold text-success m-0">{loadingStats ? '...' : stats.bebes}</h2></div></div>
         </div>
 
         {/* Filtros */}
         <div className="card shadow-sm p-3 mb-4 bg-light border-0">
             <div className="row g-2">
                 <div className="col-md-4">
-                    <div className="input-group"><span className="input-group-text bg-white"><i className="fa-solid fa-search"></i></span><input type="text" className="form-control" placeholder="Buscar..." value={busca} onChange={e => setBusca(e.target.value)}/></div>
+                    <div className="input-group"><span className="input-group-text bg-white"><i className="fa-solid fa-search"></i></span><input type="text" className="form-control" placeholder="Buscar..." value={busca} onChange={handleFiltroChange(setBusca)}/></div>
                 </div>
-                <div className="col-md-2"><select className="form-select" value={statusFiltro} onChange={e => setStatusFiltro(e.target.value)}><option value="">Todos</option><option value="EM_DIA">✅ Em dia</option><option value="ATRASADO">⚠️ Atrasado</option></select></div>
-                <div className="col-md-2"><select className="form-select" value={sexo} onChange={e => setSexo(e.target.value)}><option value="">Ambos</option><option value="M">Masculino</option><option value="F">Feminino</option></select></div>
-                <div className="col-md-2"><select className="form-select" value={ordem} onChange={e => setOrdem(e.target.value)}><option value="idade_dec">Mais novos</option><option value="nome">A-Z</option></select></div>
+                <div className="col-md-2"><select className="form-select" value={statusFiltro} onChange={handleFiltroChange(setStatusFiltro)}><option value="">Todos</option><option value="EM_DIA">✅ Em dia</option><option value="ATRASADO">⚠️ Atrasado</option></select></div>
+                <div className="col-md-2"><select className="form-select" value={sexo} onChange={handleFiltroChange(setSexo)}><option value="">Ambos</option><option value="M">Masculino</option><option value="F">Feminino</option></select></div>
+                <div className="col-md-2"><select className="form-select" value={ordem} onChange={handleFiltroChange(setOrdem)}><option value="idade_dec">Mais novos</option><option value="nome">A-Z</option></select></div>
                 <div className="col-md-2"><button className="btn btn-outline-secondary w-100" onClick={limparFiltros}>Limpar</button></div>
             </div>
         </div>
 
-        {/* Tabela */}
-        {loading ? (
-            <div className="text-center py-5"><div className="spinner-border text-primary"></div></div>
-        ) : (
-            <div className="card shadow-sm">
-                <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0">
-                        <thead className="table-light">
-                            <tr><th>Nome</th><th>Bairro</th><th>Idade</th><th>Sexo</th><th>Status</th><th className="text-end">Ações</th></tr>
-                        </thead>
-                        <tbody>
-                            {criancas.map(c => (
+        {/* Tabela com efeito visual suave no Loading */}
+        <div className="card shadow-sm position-relative">
+            {/* Efeito de carregamento por cima da tabela */}
+            {loadingLista && (
+                <div className="position-absolute w-100 h-100 d-flex justify-content-center align-items-center" style={{backgroundColor: 'rgba(255,255,255,0.6)', zIndex: 10}}>
+                    <div className="spinner-border text-primary"></div>
+                </div>
+            )}
+            
+            <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0">
+                    <thead className="table-light">
+                        <tr><th>Nome</th><th>Bairro</th><th>Idade</th><th>Sexo</th><th>Status</th><th className="text-end">Ações</th></tr>
+                    </thead>
+                    <tbody>
+                        {criancas.length === 0 && !loadingLista ? (
+                            <tr><td colSpan="6" className="text-center py-4 text-muted">Nenhuma criança encontrada.</td></tr>
+                        ) : (
+                            criancas.map(c => (
                                 <tr key={c.id}>
                                     <td className="fw-bold">{c.nome}</td>
                                     <td>{c.localidade}</td>
@@ -127,15 +154,15 @@ function Censo() {
                                     <td>{c.status_geral === 'EM_DIA' ? <span className="badge bg-success">Em dia</span> : <span className="badge bg-danger">Atrasado</span>}</td>
                                     <td className="text-end"><Link to={`/crianca/${c.id}`} className="btn btn-primary btn-sm">Abrir</Link></td>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            ))
+                        )}
+                    </tbody>
+                </table>
             </div>
-        )}
+        </div>
 
         {/* PAGINAÇÃO */}
-        {!loading && totalItems > 0 && (
+        {totalItems > 0 && (
             <Pagination 
                 currentPage={page} 
                 totalItems={totalItems} 

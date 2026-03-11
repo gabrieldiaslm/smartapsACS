@@ -52,19 +52,19 @@ class Crianca(models.Model):
         hoje = date.today()
         idade_meses = self.idade_em_meses
         
-        registros_para_atualizar = self.registros.filter(
+        # BÔNUS DE PERFORMANCE: O .update() faz o banco atualizar todas de uma vez, sem usar o 'for'
+        self.registros.filter(
             status='PENDENTE', 
             vacina__idade_alvo_meses__lt=idade_meses
-        )
-        
-        for registro in registros_para_atualizar:
-            registro.status = 'ATRASADA'
-            registro.save()
+        ).update(status='ATRASADA')
     
     @property
     def status_geral(self):
-        if self.registros.filter(status='ATRASADA').exists():
-            return 'ATRASADO'
+        # A MÁGICA DO N+1: O uso de .all() avisa o Django para checar a memória RAM (prefetch)
+        # em vez de usar .filter() que forçaria uma nova ida ao banco de dados.
+        for registro in self.registros.all():
+            if registro.status == 'ATRASADA':
+                return 'ATRASADO'
         return 'EM_DIA'
     
     @property

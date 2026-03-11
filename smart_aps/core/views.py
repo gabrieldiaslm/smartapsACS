@@ -11,10 +11,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-
+from django.core.cache import cache
 from .models import Crianca, Vacina, RegistroVacina, UsuarioACS, LoteVacina
 from .forms import CriancaForm, RegistroVacinaForm, UsuarioACSForm
-from .serializers import CriancaSerializer, RegistroVacinaSerializer, VacinaSerializer
+from .serializers import CriancaSerializer, RegistroVacinaSerializer, VacinaSerializer, CriancaListSerializer
 
 # --- FUNÇÕES AUXILIARES (HELPER FUNCTIONS) ---
 def get_data_corte_10_anos():
@@ -75,39 +75,73 @@ class CriancaViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     search_fields = ['nome', 'cns', 'nome_mae']
     filterset_fields = ['sexo', 'localidade']
-
+    def get_serializer_class(self):
+        # A MÁGICA: Se a ação for 'list' (listar tabela/paginação), usa o serializador "dieta"
+        if self.action == 'list':
+            return CriancaListSerializer
+        # Para 'retrieve' (abrir 1 paciente), 'create', 'update', usa o completão
+        return super().get_serializer_class()
     def get_queryset(self):
-        # Usa a função auxiliar
-        qs = get_criancas_queryset(filtrar_idade=True)
+        # 1. Troque a função pesada por uma query simples, limpa e com prefetch para a RAM
+        qs = Crianca.objects.all().prefetch_related('registros')
 
+        # 2. Bulk Update (Solução 2) continua intacta e rápida
         if self.request.query_params.get('atualizar') == 'true':
-            for c in qs.prefetch_related('registros__vacina'):
-                c.verificar_atrasos()
+            hoje = date.today()
+            todas_vacinas = Vacina.objects.all()
+            for vacina in todas_vacinas:
+                dias_alvo = vacina.idade_alvo_meses * 30.41
+                data_limite = hoje - timedelta(days=int(dias_alvo))
+                RegistroVacina.objects.filter(
+                    status='PENDENTE',
+                    vacina=vacina,
+                    crianca__data_nascimento__lt=data_limite
+                ).update(status='ATRASADA')
 
+        # 3. O SEGREDO DA VELOCIDADE: Filtros nativos (Join simples) em vez de Annotate
         status_filter = self.request.query_params.get('status_filtro')
         if status_filter == 'ATRASADO':
-            qs = qs.filter(is_atrasado=True)
+            # Traz crianças que têm pelo menos UM registro 'ATRASADA'
+            qs = qs.filter(registros__status='ATRASADA').distinct()
         elif status_filter == 'EM_DIA':
-            qs = qs.filter(is_atrasado=False)
+            # Exclui crianças que têm qualquer registro 'ATRASADA'
+            qs = qs.exclude(registros__status='ATRASADA')
 
+        # 4. Ordenação simples
         ordem = self.request.query_params.get('ordem')
         if ordem == 'nome': qs = qs.order_by('nome')
-        elif ordem == 'idade_cresc': qs = qs.order_by('data_nascimento')
-        elif ordem == 'idade_dec': qs = qs.order_by('-data_nascimento')
+        elif ordem == 'idade_cresc': qs = qs.order_by('-data_nascimento')
+        elif ordem == 'idade_dec': qs = qs.order_by('data_nascimento')
         else: qs = qs.order_by('-id')
 
         return qs
     
     @action(detail=False, methods=['get'])
     def estatisticas(self, request):
-        um_ano_atras = date.today() - timedelta(days=365)
-        # Agregação direta no banco
-        dados = Crianca.objects.aggregate(
-            total=Count('id'),
-            meninos=Count('id', filter=Q(sexo='M')),
-            meninas=Count('id', filter=Q(sexo='F')),
-            bebes=Count('id', filter=Q(data_nascimento__gt=um_ano_atras))
-        )
+        # Tenta pegar da memória RAM do servidor
+        dados = cache.get('api_estatisticas_censo')
+
+        if not dados:
+            hoje = date.today()
+            um_ano_atras = hoje - timedelta(days=365)
+            
+            # Corte de 10 anos exatos (considerando 2 anos bissextos na conta = 3652 dias)
+            dez_anos_atras = hoje - timedelta(days=3652)
+            
+            # 1. Filtramos PRIMEIRO a base para excluir quem tem 10 anos ou mais
+            base_infantil = Crianca.objects.filter(data_nascimento__gt=dez_anos_atras)
+            
+            # 2. Fazemos a contagem em cima dessa base já enxugada
+            dados = base_infantil.aggregate(
+                total=Count('id'),
+                meninos=Count('id', filter=Q(sexo='M')),
+                meninas=Count('id', filter=Q(sexo='F')),
+                bebes=Count('id', filter=Q(data_nascimento__gt=um_ano_atras))
+            )
+            
+            # Salva no cache por 1 hora
+            cache.set('api_estatisticas_censo', dados, 3600)
+            
         return Response(dados)
 
 class RegistroVacinaViewSet(viewsets.ModelViewSet):
@@ -182,17 +216,27 @@ def censo_demografico(request):
     elif ordem_filtro == 'idade_cresc': qs = qs.order_by('data_nascimento')
     else: qs = qs.order_by('-data_nascimento')
 
-    # Estatísticas
-    um_ano_atras = date.today() - timedelta(days=365)
-    data_corte = get_data_corte_10_anos()
+    # ==========================================
+    # SISTEMA DE CACHE PARA AS ESTATÍSTICAS
+    # ==========================================
+    # Tenta pegar os dados já processados da memória
+    stats = cache.get('estatisticas_censo_geral')
     
-    # Query separada para stats totais (independente dos filtros da tabela)
-    stats = Crianca.objects.filter(data_nascimento__gt=data_corte).aggregate(
-        total=Count('id'),
-        meninos=Count('id', filter=Q(sexo='M')),
-        meninas=Count('id', filter=Q(sexo='F')),
-        bebes=Count('id', filter=Q(data_nascimento__gt=um_ano_atras))
-    )
+    # Se não existir na memória (ou se o tempo expirou), calcula no banco
+    if not stats:
+        um_ano_atras = date.today() - timedelta(days=365)
+        data_corte = get_data_corte_10_anos()
+        
+        # Query pesada feita apenas 1 vez por hora
+        stats = Crianca.objects.filter(data_nascimento__gt=data_corte).aggregate(
+            total=Count('id'),
+            meninos=Count('id', filter=Q(sexo='M')),
+            meninas=Count('id', filter=Q(sexo='F')),
+            bebes=Count('id', filter=Q(data_nascimento__gt=um_ano_atras))
+        )
+        # Salva o resultado no cache por 3600 segundos (1 hora)
+        cache.set('estatisticas_censo_geral', stats, 3600)
+    # ==========================================
 
     paginator = Paginator(qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
@@ -273,6 +317,7 @@ def cadastrar_crianca(request):
             nova_crianca = form.save(commit=False)
             nova_crianca.cadastrado_por = request.user
             nova_crianca.save()
+            cache.delete('estatisticas_censo_geral')
             return redirect('cartao_vacina', nova_crianca.id)
     else:
         form = CriancaForm()
