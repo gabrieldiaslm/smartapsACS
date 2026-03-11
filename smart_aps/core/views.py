@@ -70,18 +70,6 @@ class VacinaViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = VacinaSerializer
     pagination_class = None
 
-from datetime import date, timedelta
-from django.db.models import Count, Q
-from django.core.cache import cache
-from rest_framework import viewsets, filters
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from django_filters.rest_framework import DjangoFilterBackend
-
-# Ajuste os imports abaixo conforme o nome do seu app (ex: core.models)
-from .models import Crianca, Vacina, RegistroVacina
-from .serializers import CriancaSerializer, CriancaListSerializer
-
 class CriancaViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     search_fields = ['nome', 'cns', 'nome_mae']
